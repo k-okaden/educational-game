@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>あたらしいゲーム</title>
+  <link rel="stylesheet" href="../../shared/core.css" />
+</head>
+<body>
+  <main class="eg-main">
+    <div id="progress"></div>
+    <div id="stage"></div>
+    <div class="eg-word" id="word"></div>
+    <div id="choices"></div>
+  </main>
+
+  <script src="../../shared/core.js"></script>
+  <script>
+    // ひな形：このフォルダをコピーして games/<id>/ にし、registry.js に1行足す
+    const GAME_ID = "template";
+    const ROUND = 5;
+    let q = 0;
+
+    EG.mountHeader({ title: "あたらしいゲーム" });
+
+    function next() {
+      if (q >= ROUND) return EG.showReward({ onAgain: () => { q = 0; next(); } });
+      EG.renderProgress(document.getElementById("progress"), q, ROUND);
+      const n = EG.randInt(1, 10);
+      EG.renderBlocks(document.getElementById("stage"), [{ count: n, color: "a" }], { size: EG.blockSize(n) });
+      EG.say("How many?");
+      EG.renderChoices(document.getElementById("choices"), EG.makeChoices(n, 3, 1, 10), n, {
+        onCorrect: async () => {
+          await EG.sayNumber(n);
+          EG.stars.add(GAME_ID);
+          q++;
+          await EG.wait(800);
+          next();
+        },
+      });
+    }
+    next();
+  </script>
+</body>
+</html>
