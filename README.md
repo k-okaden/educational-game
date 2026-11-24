@@ -16,6 +16,7 @@
 - 数字・式はすべて **英語で読み上げ**（"three plus two equals five!"）
 - まちがえてもペナルティなし。正解でほし⭐がたまる
 - 一度ひらけば **オフラインでも遊べる**（ホーム画面に追加するとアプリっぽく全画面で起動）
+- **クラウド同期**（任意）：同じ「かぞくコード」の端末どうしで ⭐ を共有。設定は [docs/cloud-sync.md](docs/cloud-sync.md)
 
 ## タブレットで遊ぶ（GitHub Pages）
 
@@ -46,6 +47,9 @@ games/<id>/           ゲームごとのフォルダ
 games/_template/      新しいゲームのひな形
 shared/core.css       共通の見た目（ボタン、ブロック、ごほうび画面）
 shared/core.js        共通の機能（読み上げ、効果音、ほし、ブロック描画、紙ふぶき）
+shared/cloud.js       クラウド同期（cloud-config.js に設定があるときだけ読み込む）
+shared/vendor/        同梱ライブラリ（QRコード生成：qrcode-generator, MIT）
+firestore.rules       クラウド同期用の Firestore セキュリティルール
 sw.js                 オフライン対応
 ```
 

@@ -14,6 +14,8 @@
 (function () {
   "use strict";
   const EG = (window.EG = window.EG || {});
+  // このリポジトリのトップ（index.html がある場所）の URL
+  EG.ROOT = (document.currentScript && document.currentScript.src.replace(/shared\/core\.js.*$/, "")) || "./";
 
   // ---------- 便利関数 ----------
   EG.randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -188,19 +190,45 @@
   }, { once: true });
 
   // ---------- ほし（ごほうびポイント） ----------
+  // eg.stars        : この端末でためた数 { gameId: n }
+  // eg.stars.others : クラウド同期した「ほかの端末」の数 { deviceId: { gameId: n } }（cloud.js が書く）
+  // 表示する数 = この端末 + ほかの端末 の合計。端末ごとに別々に記録するので、同時に遊んでもぶつからない。
   const STARS_KEY = "eg.stars";
+  const OTHERS_KEY = "eg.stars.others";
   EG.stars = {
-    all() { return safeJSON(localStorage.getItem(STARS_KEY)); },
-    get(gameId) { return gameId ? this.all()[gameId] || 0 : Object.values(this.all()).reduce((a, b) => a + b, 0); },
+    own() { return safeJSON(localStorage.getItem(STARS_KEY)); },
+    others() { return safeJSON(localStorage.getItem(OTHERS_KEY)); },
+    setOthers(o) { safeSet(OTHERS_KEY, JSON.stringify(o || {})); this.refresh(false); },
+    all() {
+      const sum = Object.assign({}, this.own());
+      for (const dev of Object.values(this.others())) {
+        for (const [g, n] of Object.entries(dev || {})) sum[g] = (sum[g] || 0) + (+n || 0);
+      }
+      return sum;
+    },
+    get(gameId) { const a = this.all(); return gameId ? a[gameId] || 0 : Object.values(a).reduce((x, y) => x + y, 0); },
     add(gameId, n = 1) {
-      const all = this.all();
-      all[gameId] = (all[gameId] || 0) + n;
-      safeSet(STARS_KEY, JSON.stringify(all));
-      document.querySelectorAll(".eg-stars").forEach((el) => {
-        el.querySelector("b").textContent = this.get();
-        el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
+      const own = this.own();
+      own[gameId] = (own[gameId] || 0) + n;
+      safeSet(STARS_KEY, JSON.stringify(own));
+      this.refresh(true);
+      window.dispatchEvent(new Event("eg:stars-added")); // クラウド同期がこれを聞いて送る
+      return this.get(gameId);
+    },
+    /** すべて 0 にする（同期中ならほかの端末のぶんも cloud.js が消す） */
+    reset() {
+      safeSet(STARS_KEY, "{}");
+      safeSet(OTHERS_KEY, "{}");
+      this.refresh(false);
+      window.dispatchEvent(new Event("eg:stars-reset"));
+    },
+    /** 画面のほしの数を更新 */
+    refresh(bump) {
+      document.querySelectorAll(".eg-stars b").forEach((b) => {
+        b.textContent = this.get();
+        if (bump) { const el = b.parentElement; el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
       });
-      return all[gameId];
+      window.dispatchEvent(new Event("eg:stars"));
     },
   };
 
@@ -365,7 +393,21 @@
 
   // ---------- オフライン対応 ----------
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-    const root = document.currentScript?.src.replace(/shared\/core\.js.*$/, "") || "/";
-    window.addEventListener("load", () => navigator.serviceWorker.register(root + "sw.js").catch(() => {}));
+    window.addEventListener("load", () => navigator.serviceWorker.register(EG.ROOT + "sw.js").catch(() => {}));
   }
+
+  // ---------- クラウド同期（設定されているときだけ読み込む） ----------
+  // shared/cloud-config.js に Firebase の設定があれば shared/cloud.js を読み込む。
+  // ゲーム側は何もしなくてよい（ほしは EG.stars 経由で自動的に同期される）。
+  function loadScript(src) {
+    return new Promise((res, rej) => {
+      const el = document.createElement("script");
+      el.src = src; el.onload = res; el.onerror = rej;
+      document.head.appendChild(el);
+    });
+  }
+  EG.cloudReady = loadScript(EG.ROOT + "shared/cloud-config.js")
+    .then(() => (window.EG_CLOUD_CONFIG && window.EG_CLOUD_CONFIG.apiKey ? loadScript(EG.ROOT + "shared/cloud.js") : null))
+    .then(() => EG.cloud || null)
+    .catch(() => null);
 })();

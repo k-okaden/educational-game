@@ -70,6 +70,18 @@
     dialog .rate-wrap input { flex: 1; width: auto; }
     dialog .test { width: 100%; min-height: 60px; font-size: 22px; margin-top: 12px; background: #e8f0ff; }
     dialog .note { font-size: 14px; color: var(--ink-soft); line-height: 1.6; }
+    dialog .cloud { border-top: 1px solid #eee; margin-top: 12px; }
+    dialog .cloud h3 { margin: 16px 0 4px; font-size: 22px; }
+    dialog .sub { min-height: 60px; font-size: 20px; padding: 8px 18px; background: #eef7ee; }
+    dialog .sub:disabled { opacity: .5; }
+    dialog #c-create { width: 100%; }
+    dialog .join-row, dialog .row2 { display: flex; gap: 10px; margin-top: 10px; }
+    dialog .row2 .sub { flex: 1; }
+    dialog .join-row input { flex: 1; min-width: 0; font: inherit; font-size: 18px; padding: 10px 14px; border-radius: 14px; border: 2px solid #ddd; letter-spacing: .05em; }
+    dialog .code-line { text-align: center; margin: 8px 0; }
+    dialog .code-line b { font-size: 22px; letter-spacing: .06em; font-family: ui-monospace, Menlo, monospace; }
+    dialog .qr { width: 180px; margin: 0 auto; background: #fff; }
+    dialog .err { color: #d63031; font-size: 16px; min-height: 1em; }
     dialog .danger { background: #ffe3e3; font-size: 18px; min-height: 52px; width: 100%; margin-top: 12px; }
   </style>
 </head>
@@ -94,6 +106,28 @@
     <p class="note">声が日本語っぽいときは、端末の設定で英語（English US）の声を追加してください。<br>
       iPad：設定 → アクセシビリティ → 読み上げコンテンツ → 声 → English → Samantha など（「拡張」「プレミアム」がおすすめ）<br>
       Android：設定 → システム → 言語 → 音声出力（テキスト読み上げ）→ Google 音声サービス → 英語（米国）の音声をインストール</p>
+    <section id="cloud" class="cloud eg-hidden">
+      <h3>☁️ クラウドどうき</h3>
+      <div id="c-off">
+        <p class="note">おなじ「かぞくコード」を入れた たんまつどうしで、ほしの数が おなじになります。送るのは ほしの数だけです。</p>
+        <button class="eg-btn sub" id="c-create">あたらしく はじめる</button>
+        <div class="join-row">
+          <input id="c-code" placeholder="かぞくコード（20もじ）" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+          <button class="eg-btn sub" id="c-join">つなぐ</button>
+        </div>
+      </div>
+      <div id="c-on" class="eg-hidden">
+        <p class="code-line">かぞくコード<br /><b id="c-code-show"></b></p>
+        <div id="c-qr" class="qr"></div>
+        <p class="note">ほかの たんまつの カメラで このQRを よみとるか、コードを入れると つながります。<br>コードは ほかの人に 見せないでください。</p>
+        <p id="c-status" class="note"></p>
+        <div class="row2">
+          <button class="eg-btn sub" id="c-sync">🔄 いま どうき</button>
+          <button class="eg-btn sub" id="c-leave">やめる</button>
+        </div>
+      </div>
+      <p id="c-err" class="err"></p>
+    </section>
     <button class="eg-btn danger" id="s-reset">ほしを 0 にもどす</button>
     <button class="eg-btn close" id="s-close">とじる</button>
   </dialog>
@@ -102,24 +136,36 @@
   <script src="games/registry.js"></script>
   <script>
     const grid = document.getElementById("grid");
-    window.EG_GAMES.filter((g) => !g.hidden).forEach((g, i) => {
-      const a = document.createElement("a");
-      a.className = "card";
-      a.href = g.href;
-      a.style.setProperty("--c", g.color);
-      a.style.animationDelay = i * 70 + "ms";
-      a.innerHTML = `<span class="mystars"></span><span class="emoji"></span><span class="t"></span><span class="s"></span>`;
-      const ic = a.querySelector(".emoji");
-      ic.textContent = g.symbol || g.emoji;
-      if (g.symbol) ic.classList.add("sym");
-      a.querySelector(".t").textContent = g.title;
-      a.querySelector(".s").textContent = g.sub || "";
-      const st = EG.stars.get(g.id);
-      if (st) a.querySelector(".mystars").textContent = "⭐" + st; else a.querySelector(".mystars").remove();
-      a.addEventListener("click", () => EG.sfx.tap());
-      grid.appendChild(a);
-    });
-    document.querySelector("#total b").textContent = EG.stars.get();
+    function renderCards() {
+      grid.innerHTML = "";
+      window.EG_GAMES.filter((g) => !g.hidden).forEach((g, i) => {
+        const a = document.createElement("a");
+        a.className = "card";
+        a.href = g.href;
+        a.style.setProperty("--c", g.color);
+        a.style.animationDelay = i * 70 + "ms";
+        a.innerHTML = `<span class="mystars"></span><span class="emoji"></span><span class="t"></span><span class="s"></span>`;
+        const ic = a.querySelector(".emoji");
+        ic.textContent = g.symbol || g.emoji;
+        if (g.symbol) ic.classList.add("sym");
+        a.querySelector(".t").textContent = g.title;
+        a.querySelector(".s").textContent = g.sub || "";
+        a.addEventListener("click", () => EG.sfx.tap());
+        grid.appendChild(a);
+      });
+      updateStars();
+    }
+    function updateStars() {
+      const cards = grid.querySelectorAll(".card");
+      window.EG_GAMES.filter((g) => !g.hidden).forEach((g, i) => {
+        const st = EG.stars.get(g.id), el = cards[i].querySelector(".mystars");
+        el.textContent = st ? "⭐" + st : "";
+        el.style.display = st ? "" : "none";
+      });
+      document.querySelector("#total b").textContent = EG.stars.get();
+    }
+    renderCards();
+    window.addEventListener("eg:stars", updateStars); // クラウド同期で数が変わったとき
 
     // 設定
     const dlg = document.getElementById("settings");
@@ -146,8 +192,55 @@
     $("s-voice").onchange = (e) => { EG.settings.voice = e.target.checked; EG.saveSettings(); };
     $("s-rate").onchange = (e) => { EG.settings.rate = +e.target.value; EG.saveSettings(); EG.say("one, two, three"); };
     $("s-reset").onclick = () => {
-      if (confirm("ほしの記録を消しますか？")) { localStorage.removeItem("eg.stars"); location.reload(); }
+      const linked = EG.cloud && EG.cloud.state().linked;
+      if (confirm(linked ? "ほしの記録を消しますか？\n（クラウドどうき中の ほかの端末の ほしも 0 になります）" : "ほしの記録を消しますか？")) EG.stars.reset();
     };
+
+    // ---- クラウドどうき ----
+    EG.cloudReady.then((cloud) => {
+      if (!cloud) return; // 設定されていなければ表示しない
+      $("cloud").classList.remove("eg-hidden");
+      const err = (e) => { $("c-err").textContent = e ? e.message || e : ""; };
+      const busy = async (btn, fn) => {
+        btn.disabled = true; err("");
+        try { await fn(); } catch (e) { err(e); } finally { btn.disabled = false; }
+      };
+      $("c-create").onclick = (e) => busy(e.currentTarget, () => cloud.create());
+      $("c-join").onclick = (e) => busy(e.currentTarget, () => cloud.join($("c-code").value));
+      $("c-sync").onclick = (e) => busy(e.currentTarget, () => cloud.syncNow());
+      $("c-leave").onclick = () => {
+        if (confirm("クラウドどうきを やめますか？\n（この端末の ほしは のこります）")) cloud.leave();
+      };
+      let qrFor = "";
+      function renderCloud() {
+        const s = cloud.state();
+        $("c-off").classList.toggle("eg-hidden", s.linked);
+        $("c-on").classList.toggle("eg-hidden", !s.linked);
+        if (s.error) err(s.error);
+        if (!s.linked) return;
+        $("c-code-show").textContent = s.code;
+        $("c-status").textContent = `つながっている たんまつ：${s.devices}だい` +
+          (s.lastSync ? `／さいごに どうき：${new Date(s.lastSync).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}` : "");
+        const url = cloud.joinUrl();
+        if (url !== qrFor && url.startsWith("http")) {
+          qrFor = url;
+          loadQr().then(() => {
+            const qr = qrcode(0, "M");
+            qr.addData(url);
+            qr.make();
+            $("c-qr").innerHTML = qr.createSvgTag({ cellSize: 5, margin: 2, scalable: true });
+          });
+        }
+      }
+      let qrLib;
+      const loadQr = () => qrLib || (qrLib = new Promise((res, rej) => {
+        const el = document.createElement("script");
+        el.src = "shared/vendor/qrcode.js"; el.onload = res; el.onerror = rej;
+        document.head.appendChild(el);
+      }));
+      window.addEventListener("eg:cloud", renderCloud);
+      renderCloud();
+    });
     $("s-close").onclick = () => dlg.close();
   </script>
 </body>
