@@ -58,12 +58,18 @@
       border: none; border-radius: var(--radius); padding: 28px; max-width: 520px; width: calc(100% - 32px);
       font-family: var(--font); color: var(--ink); box-shadow: 0 20px 60px rgba(0,0,0,.25);
     }
+    dialog { max-height: calc(100dvh - 32px); overflow-y: auto; }
     dialog::backdrop { background: rgba(59,47,42,.4); }
     dialog h2 { margin-top: 0; }
     dialog label { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; font-size: 20px; border-bottom: 1px solid #eee; }
     dialog input[type=checkbox] { width: 32px; height: 32px; }
     dialog input[type=range] { width: 50%; }
     dialog .close { margin-top: 20px; width: 100%; min-height: 64px; font-size: 24px; }
+    dialog select { font: inherit; font-size: 18px; max-width: 60%; padding: 8px; border-radius: 12px; }
+    dialog .rate-wrap { display: flex; align-items: center; gap: 8px; width: 60%; }
+    dialog .rate-wrap input { flex: 1; width: auto; }
+    dialog .test { width: 100%; min-height: 60px; font-size: 22px; margin-top: 12px; background: #e8f0ff; }
+    dialog .note { font-size: 14px; color: var(--ink-soft); line-height: 1.6; }
     dialog .danger { background: #ffe3e3; font-size: 18px; min-height: 52px; width: 100%; margin-top: 12px; }
   </style>
 </head>
@@ -82,7 +88,12 @@
     <h2>おうちのかたへ</h2>
     <label>こうかおん <input type="checkbox" id="s-sound" /></label>
     <label>よみあげ（えいご） <input type="checkbox" id="s-voice" /></label>
-    <label>よみあげの はやさ <input type="range" id="s-rate" min="0.5" max="1.2" step="0.05" /></label>
+    <label>えいごの こえ <select id="s-voiceuri"></select></label>
+    <label>よみあげの はやさ <span class="rate-wrap">🐢 <input type="range" id="s-rate" min="0.5" max="1.1" step="0.05" /> 🐇</span></label>
+    <button class="eg-btn test" id="s-test">▶ ためしに きく</button>
+    <p class="note">声が日本語っぽいときは、端末の設定で英語（English US）の声を追加してください。<br>
+      iPad：設定 → アクセシビリティ → 読み上げコンテンツ → 声 → English → Samantha など（「拡張」「プレミアム」がおすすめ）<br>
+      Android：設定 → システム → 言語 → 音声出力（テキスト読み上げ）→ Google 音声サービス → 英語（米国）の音声をインストール</p>
     <button class="eg-btn danger" id="s-reset">ほしを 0 にもどす</button>
     <button class="eg-btn close" id="s-close">とじる</button>
   </dialog>
@@ -117,8 +128,20 @@
       $("s-sound").checked = EG.settings.sound;
       $("s-voice").checked = EG.settings.voice;
       $("s-rate").value = EG.settings.rate;
+      fillVoices();
       dlg.showModal();
     };
+    async function fillVoices() {
+      await EG.voicesReady;
+      const sel = $("s-voiceuri");
+      sel.innerHTML = "";
+      sel.add(new Option("おすすめ（じどう）", ""));
+      EG.englishVoices().forEach((v) => sel.add(new Option(`${v.name} (${v.lang})`, v.voiceURI)));
+      sel.value = EG.settings.voiceURI;
+      if (sel.value !== EG.settings.voiceURI) sel.value = "";
+    }
+    $("s-voiceuri").onchange = (e) => { EG.settings.voiceURI = e.target.value; EG.saveSettings(); EG.say("one, two, three. Three plus two equals five!"); };
+    $("s-test").onclick = () => EG.say("one, two, three. Three plus two equals five!");
     $("s-sound").onchange = (e) => { EG.settings.sound = e.target.checked; EG.saveSettings(); };
     $("s-voice").onchange = (e) => { EG.settings.voice = e.target.checked; EG.saveSettings(); };
     $("s-rate").onchange = (e) => { EG.settings.rate = +e.target.value; EG.saveSettings(); EG.say("one, two, three"); };

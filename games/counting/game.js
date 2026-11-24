@@ -75,7 +75,7 @@
       blocks[i].innerHTML = `<span class="num">${i + 1}</span>`;
       word.textContent = EG.numberWord(i + 1);
       EG.sfx.pop(i);
-      await EG.say(EG.numberWord(i + 1), "en", { rate: 1.1 });
+      await EG.say(EG.numberWord(i + 1), "en", { speed: 1.2 });
       await EG.wait(80);
     }
   }

@@ -232,7 +232,7 @@
             rows[r].tag.classList.add("on");
             rows[r].g.querySelectorAll(".eg-block").forEach((b) => { b.classList.remove("tapped"); void b.offsetWidth; b.classList.add("tapped"); });
             EG.sfx.pop(r * 2);
-            await EG.say(EG.numberWord(n), "en", { rate: 1.1 });
+            await EG.say(EG.numberWord(n), "en", { speed: 1.2 });
           }
         },
       };

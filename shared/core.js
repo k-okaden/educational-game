@@ -57,53 +57,94 @@
 
   // ---------- 設定 ----------
   const SETTINGS_KEY = "eg.settings";
-  const defaults = { sound: true, voice: true, rate: 0.85 };
-  EG.settings = Object.assign({}, defaults, safeJSON(localStorage.getItem(SETTINGS_KEY)));
+  const SETTINGS_VERSION = 2; // 標準の速さを変えたときに上げる（古い保存値をリセット）
+  // rate: 英語の読み上げ速度（1 = 標準）。幼児向けにゆっくりめ
+  // voiceURI: 「おうちのかたへ」で選んだ英語の声（空ならおすすめを自動で選ぶ）
+  const defaults = { v: SETTINGS_VERSION, sound: true, voice: true, rate: 0.75, voiceURI: "" };
+  const stored = safeJSON(localStorage.getItem(SETTINGS_KEY));
+  if (stored.v !== SETTINGS_VERSION) delete stored.rate;
+  EG.settings = Object.assign({}, defaults, stored, { v: SETTINGS_VERSION });
   EG.saveSettings = () => safeSet(SETTINGS_KEY, JSON.stringify(EG.settings));
 
   function safeJSON(s) { try { return JSON.parse(s) || {}; } catch { return {}; } }
   function safeSet(k, v) { try { localStorage.setItem(k, v); } catch { /* プライベートモード等 */ } }
 
   // ---------- 読み上げ（Web Speech API） ----------
+  // 端末の声の一覧はあとから非同期で届くことがある（Safari / Chrome）。
+  // 届く前に読み上げると英語の声が選ばれず、日本語の声で英語を読んでしまうので、待ってから選ぶ。
+  const hasSpeech = "speechSynthesis" in window;
   let voices = [];
-  const loadVoices = () => { try { voices = speechSynthesis.getVoices(); } catch { voices = []; } };
-  if ("speechSynthesis" in window) {
-    loadVoices();
-    speechSynthesis.addEventListener?.("voiceschanged", loadVoices);
+  const loadVoices = () => { try { voices = speechSynthesis.getVoices() || []; } catch { voices = []; } return voices; };
+  EG.voicesReady = new Promise((resolve) => {
+    if (!hasSpeech || loadVoices().length) return resolve();
+    const done = () => { loadVoices(); resolve(); };
+    speechSynthesis.addEventListener?.("voiceschanged", done, { once: true });
+    setTimeout(done, 2000);
+  });
+  if (hasSpeech) speechSynthesis.addEventListener?.("voiceschanged", loadVoices);
+
+  const normLang = (v) => (v.lang || "").replace("_", "-").toLowerCase();
+  // Apple のおもしろ音声・古い合成音声は子どもの耳に向かないので避ける
+  const NOVELTY = /albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|fred|junior|ralph|kathy|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley/i;
+  const QUALITY = /premium|enhanced|natural|neural|online/i;
+  const FAVORITE = /samantha|ava|allison|susan|zoe|nicky|evan|google us english|google uk english female|aria|jenny|guy|libby|sonia/i;
+
+  function scoreEnVoice(v) {
+    const lang = normLang(v);
+    if (!lang.startsWith("en")) return -Infinity;
+    let s = 0;
+    if (lang === "en-us") s += 30;
+    else if (lang === "en-gb" || lang === "en-au" || lang === "en-ca") s += 20;
+    else s += 5; // en-IN など
+    if (QUALITY.test(v.name)) s += 25;
+    if (FAVORITE.test(v.name)) s += 20;
+    if (NOVELTY.test(v.name)) s -= 100;
+    return s;
   }
+  /** 英語の声の一覧（よい順） */
+  EG.englishVoices = () =>
+    loadVoices().filter((v) => normLang(v).startsWith("en") && scoreEnVoice(v) > -50)
+      .sort((a, b) => scoreEnVoice(b) - scoreEnVoice(a));
+
   function pickVoice(lang) {
-    const want = lang === "ja" ? "ja" : "en";
-    const list = voices.filter((v) => v.lang.toLowerCase().startsWith(want));
-    // ききとりやすい声を優先
-    const pref = want === "en"
-      ? [/samantha/i, /google us english/i, /en-us/i, /karen/i, /daniel/i]
-      : [/kyoko/i, /google 日本語/i, /o-ren/i, /ja-jp/i];
-    for (const p of pref) {
-      const v = list.find((v) => p.test(v.name) || p.test(v.lang));
-      if (v) return v;
+    if (lang === "ja") {
+      const ja = voices.filter((v) => normLang(v).startsWith("ja"));
+      return ja.find((v) => QUALITY.test(v.name)) || ja[0] || null;
     }
-    return list[0] || null;
+    if (EG.settings.voiceURI) {
+      const chosen = voices.find((v) => v.voiceURI === EG.settings.voiceURI);
+      if (chosen) return chosen;
+    }
+    return EG.englishVoices()[0] || null; // 英語の声がなければ null（日本語の声にはしない）
   }
-  /** 読み上げ。終わったら resolve する Promise を返す */
-  EG.say = (text, lang = "en", { rate, interrupt = true } = {}) =>
-    new Promise((resolve) => {
-      if (!EG.settings.voice || !("speechSynthesis" in window)) return resolve();
+
+  /**
+   * 読み上げ。終わったら resolve する Promise を返す
+   * @param {string} text
+   * @param {"en"|"ja"} lang
+   * @param {{speed?:number, interrupt?:boolean}} opt  speed は設定の速さに掛ける倍率
+   */
+  EG.say = async (text, lang = "en", { speed = 1, interrupt = true } = {}) => {
+    if (!EG.settings.voice || !hasSpeech) return;
+    await EG.voicesReady;
+    return new Promise((resolve) => {
       try {
         if (interrupt) speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
-        u.lang = lang === "ja" ? "ja-JP" : "en-US";
         const v = pickVoice(lang);
         if (v) u.voice = v;
-        u.rate = rate ?? EG.settings.rate;
-        u.pitch = 1.1;
+        u.lang = v ? v.lang : lang === "ja" ? "ja-JP" : "en-US";
+        u.rate = Math.min(1.5, Math.max(0.4, EG.settings.rate * speed));
+        u.pitch = 1;
         let done = false;
         const fin = () => { if (!done) { done = true; resolve(); } };
         u.onend = fin;
         u.onerror = fin;
-        setTimeout(fin, 1500 + text.length * 120); // 端末によって onend が来ない対策
+        setTimeout(fin, (1500 + text.length * 120) / u.rate); // 端末によって onend が来ない対策
         speechSynthesis.speak(u);
       } catch { resolve(); }
     });
+  };
   EG.sayNumber = (n) => EG.say(EG.numberWord(n));
 
   // ---------- 効果音（Web Audio、音声ファイル不要） ----------
@@ -140,7 +181,11 @@
     fanfare: () => [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, i * 0.13, 0.25, "triangle")),
   };
   // iOS は最初のタップで AudioContext を起こす必要がある
-  window.addEventListener("pointerdown", () => audio(), { once: true });
+  // iOS は最初のタップで読み上げも起こしておく（無音の発話）
+  window.addEventListener("pointerdown", () => {
+    audio();
+    if (hasSpeech) { try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); } catch { /* noop */ } }
+  }, { once: true });
 
   // ---------- ほし（ごほうびポイント） ----------
   const STARS_KEY = "eg.stars";
