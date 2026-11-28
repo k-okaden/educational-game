@@ -2,20 +2,25 @@
  * クラウド同期（各家庭が自分で用意した Firebase を使う。SDK なしで REST API を直接呼ぶ）
  *
  * しくみ
- *  - Firebase の設定値（apiKey / projectId）とログイン情報は、この端末の localStorage にだけ保存する
- *    （公開リポジトリには書かない）
- *  - ログインは保護者のアカウント1つ（メール＋パスワード）。Firebase 側で新規登録はオフにしておく
- *  - 2台目以降は QR（設定値＋ログイン情報）を読むだけでログイン
- *  - 「QR を作り直す」= パスワードをランダムに変える → 古い QR とほかの端末のログインは無効になる
+ *  - ログインは Firebase の「匿名ログイン」。メール・パスワードは使わない
+ *  - 端末ごとに別の匿名アカウントになるので、データは「おうち」単位にまとめる
+ *  - おうちには「合言葉」があり、合言葉を知っている端末だけが参加できる（firestore.rules で確認）
+ *  - 1台目：firebaseConfig を貼るだけ → おうちを作る
+ *  - 2台目以降：QR（設定値＋おうちID＋合言葉）を読むだけ
+ *  - 「QR を作り直す」= 合言葉を変える（参加ずみの端末はそのまま）。端末は1台ずつ外せる
+ *  - Firebase の設定値・おうちID・合言葉は この端末の localStorage にだけ保存する（公開リポジトリには書かない）
  *
- * Firestore のデータ（ルールは「本人の users/{uid} 以下なら何でも可」の1本だけ → ゲームが増えても変更不要）
- *   users/{uid}
+ * Firestore のデータ（ゲームごとの項目はルールに書かない → ゲームが増えても Firebase 側の変更なし）
+ *   households/{hid}
+ *     key           : 合言葉
+ *     members       : { 匿名uid: { deviceId, name, joinedAt } }   参加している端末
+ *     joinKey       : 参加するときに送る合言葉（ルールで key と同じか確認するためだけに使う）
  *     schemaVersion : データの形のバージョン
  *     profiles      : { pid: { name, icon, color, createdAt, updatedAt } }   こども一覧
  *     deleted       : { pid: 時刻 }   消したこども
  *     resets        : { pid: 時刻 }   ほしを 0 にした時刻
  *     wipedAt       : クラウドのデータをぜんぶ消した時刻
- *   users/{uid}/devices/{deviceId}
+ *   households/{hid}/devices/{deviceId}
  *     profiles      : { pid: { stars: { gameId: n }, games: { gameId: { d, t } } } }   その端末で遊んだぶん
  *     updatedAt
  *  端末は自分の devices/{deviceId} だけを書くので、同時に遊んでもぶつからない。
@@ -26,17 +31,32 @@
   const EG = window.EG;
   const { getJ, putJ } = EG.storage;
   const K = EG.KEYS;
-  const CK = "eg.cloud"; // { apiKey, projectId, email, password, uid, idToken, refreshToken, expiresAt, deviceId, lastSync, seen, needRelogin }
+  const CK = "eg.cloud"; // { apiKey, projectId, hid, key, uid, idToken, refreshToken, expiresAt, deviceId, deviceName, lastSync, seen, joined }
 
   let st = getJ(CK);
   const save = () => putJ(CK, st);
   if (!st.deviceId) { st.deviceId = "d" + EG.randomId(12); save(); }
+  // メール＋パスワード方式（旧）のログイン情報は使わない
+  if (st.email || st.password) { st = { deviceId: st.deviceId }; save(); }
 
   let error = "";
-  let devicesCount = 0;
-  let gen = 0; // ログインし直すたびに増やす（古い同期の結果で上書きしないため）
+  let devices = []; // [{ uid, deviceId, name, joinedAt, updatedAt, self }]
   let busy = null, again = false;
+  let gen = 0; // おうちに入り直すたびに増やす（古い同期の結果で上書きしないため）
   const emit = () => window.dispatchEvent(new Event("eg:cloud"));
+  const OFFLINE = "インターネットに つながりません";
+  const KEY_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+
+  /** 端末の名前（自動） */
+  function autoDeviceName() {
+    const ua = navigator.userAgent;
+    if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "iPad";
+    if (/iPhone/.test(ua)) return "iPhone";
+    if (/Android/.test(ua)) return /Mobile/.test(ua) ? "Android スマホ" : "Android タブレット";
+    if (/Macintosh/.test(ua)) return "Mac";
+    if (/Windows/.test(ua)) return "Windows";
+    return "たんまつ";
+  }
 
   // ---------- Firebase の設定値を読む ----------
   /** コンソールからコピーした firebaseConfig（JS / JSON どちらでも）から apiKey と projectId を取り出す */
@@ -57,8 +77,8 @@
   };
   /** 2台目以降に読ませる URL（カメラアプリで読んでも開けるように URL にする。#以降はサーバーに送られない） */
   function qrPayload() {
-    if (!st.password) return "";
-    const data = { v: 1, k: st.apiKey, p: st.projectId, e: st.email, w: st.password };
+    if (!st.hid || !st.key) return "";
+    const data = { v: 2, k: st.apiKey, p: st.projectId, h: st.hid, s: st.key };
     return EG.ROOT + "index.html#join=" + b64url.enc(JSON.stringify(data));
   }
   function parseQr(text) {
@@ -66,72 +86,47 @@
     if (!m) throw new Error("この QR は つかえません");
     let d;
     try { d = JSON.parse(b64url.dec(m[1])); } catch { throw new Error("この QR は よみとれませんでした"); }
-    if (d.v !== 1 || !d.k || !d.p || !d.e || !d.w) throw new Error("この QR は つかえません");
-    return { apiKey: d.k, projectId: d.p, email: d.e, password: d.w };
+    if (d.v !== 2 || !d.k || !d.p || !d.h || !d.s) throw new Error("この QR は つかえません（ふるい バージョンの QR かも しれません）");
+    return { apiKey: d.k, projectId: d.p, hid: d.h, key: d.s };
   }
 
-  // ---------- ログイン（Identity Toolkit REST） ----------
-  const AUTH_ERRORS = {
-    EMAIL_NOT_FOUND: "メールアドレスか パスワードが ちがいます",
-    INVALID_PASSWORD: "メールアドレスか パスワードが ちがいます",
-    INVALID_LOGIN_CREDENTIALS: "メールアドレスか パスワードが ちがいます",
-    INVALID_EMAIL: "メールアドレスの かたちが ちがいます",
-    USER_DISABLED: "このアカウントは とめられています",
-    OPERATION_NOT_ALLOWED: "Firebase で「メール／パスワード」のログインが有効になっていません",
-    TOO_MANY_ATTEMPTS_TRY_LATER: "しっぱいが多すぎます。しばらくしてから もういちど",
-    WEAK_PASSWORD: "パスワードが よわすぎます",
-  };
+  // ---------- 匿名ログイン（Identity Toolkit REST） ----------
   async function authCall(apiKey, path, body, form) {
-    const url = (path.startsWith("token") ? "https://securetoken.googleapis.com/v1/" : "https://identitytoolkit.googleapis.com/v1/") + path + "?key=" + encodeURIComponent(apiKey);
+    const url = (path === "token" ? "https://securetoken.googleapis.com/v1/" : "https://identitytoolkit.googleapis.com/v1/") + path + "?key=" + encodeURIComponent(apiKey);
     let res;
     try {
       res = await fetch(url, form
         ? { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(body) }
         : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    } catch { throw new Error("インターネットに つながりません"); }
+    } catch { throw new Error(OFFLINE); }
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const code = String(j.error?.message || "").split(" ")[0].split(":")[0];
-      const msg = AUTH_ERRORS[code] || (/API.?KEY|API key/i.test(j.error?.message || "") ? "apiKey が ちがいます" : "ログインできませんでした（" + (code || res.status) + "）");
+      const raw = String(j.error?.message || "");
+      const code = raw.split(" ")[0].split(":")[0];
+      let msg = "ログインできませんでした（" + (code || res.status) + "）";
+      if (code === "ADMIN_ONLY_OPERATION" || code === "OPERATION_NOT_ALLOWED") msg = "Firebase で「匿名」ログインが有効になっていません";
+      else if (/API.?KEY|API key/i.test(raw)) msg = "apiKey が ちがうか、使えない設定に なっています";
       const e = new Error(msg); e.code = code; throw e;
     }
     return j;
   }
-  async function signIn(c) {
-    const j = await authCall(c.apiKey, "accounts:signInWithPassword", { email: c.email, password: c.password, returnSecureToken: true });
+  async function signUpAnon(apiKey) {
+    const j = await authCall(apiKey, "accounts:signUp", { returnSecureToken: true });
     return { uid: j.localId, idToken: j.idToken, refreshToken: j.refreshToken, expiresAt: Date.now() + (+j.expiresIn) * 1000 };
   }
   async function token() {
-    if (!st.apiKey) throw new Error("ログインしていません");
-    const myGen = gen;
-    const stale = () => { if (myGen !== gen) throw new Error("ログインし直しました"); };
+    if (!st.apiKey || !st.uid) throw new Error("ログインしていません");
     if (st.idToken && st.expiresAt > Date.now() + 60_000) return st.idToken;
-    try {
-      const j = await authCall(st.apiKey, "token", { grant_type: "refresh_token", refresh_token: st.refreshToken || "" }, true);
-      stale();
-      Object.assign(st, { idToken: j.id_token, refreshToken: j.refresh_token, expiresAt: Date.now() + (+j.expires_in) * 1000 });
-    } catch (e) {
-      stale();
-      if (e.message === "インターネットに つながりません") throw e;
-      // トークンが無効（ほかの端末で QR を作り直した等）→ 保存しているパスワードで入り直す
-      try {
-        const a = await signIn(st);
-        stale();
-        Object.assign(st, a);
-      } catch (e2) {
-        stale();
-        if (e2.message === "インターネットに つながりません") throw e2;
-        st.needRelogin = true; save(); emit();
-        throw new Error("QR が あたらしく なりました。おとなメニューから もういちど QR を よみとってください");
-      }
-    }
-    st.needRelogin = false;
+    const myGen = gen;
+    const j = await authCall(st.apiKey, "token", { grant_type: "refresh_token", refresh_token: st.refreshToken || "" }, true);
+    if (myGen !== gen) throw new Error("ログインし直しました");
+    Object.assign(st, { idToken: j.id_token, refreshToken: j.refresh_token, expiresAt: Date.now() + (+j.expires_in) * 1000 });
     save();
     return st.idToken;
   }
 
   // ---------- Firestore REST ----------
-  const base = () => `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(st.projectId)}/databases/(default)/documents/users/${st.uid}`;
+  const docBase = (c) => `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(c.projectId)}/databases/(default)/documents/households/${c.hid}`;
   function enc(v) {
     if (typeof v === "number") return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
     if (typeof v === "string") return { stringValue: v };
@@ -153,9 +148,16 @@
   const fields = (obj) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, enc(v)]));
   const unfields = (doc) => Object.fromEntries(Object.entries(doc?.fields || {}).map(([k, v]) => [k, dec(v)]));
 
-  async function fs(method, path = "", { body, mask, query = "" } = {}) {
-    const t = await token();
-    let url = base() + path;
+  class Forbidden extends Error {}
+  /**
+   * @param {string} method
+   * @param {string} path  households/{hid} からの相対パス
+   * @param {{body?:object, mask?:string[], query?:string, c?:object, idToken?:string}} opt
+   *        c / idToken：まだ保存していないおうち・アカウントで呼ぶとき（作成・参加）
+   */
+  async function fs(method, path = "", { body, mask, query = "", c = st, idToken } = {}) {
+    const t = idToken || (await token());
+    let url = docBase(c) + path;
     const qs = [];
     if (mask) mask.forEach((m) => qs.push("updateMask.fieldPaths=" + encodeURIComponent(m)));
     if (query) qs.push(query);
@@ -163,13 +165,13 @@
     let res;
     try {
       res = await fetch(url, { method, headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
-    } catch { throw new Error("インターネットに つながりません"); }
+    } catch { throw new Error(OFFLINE); }
     if (res.status === 404) return null;
-    if (res.status === 403) throw new Error("Firestore に書きこめません（ルールを確認してください）");
+    if (res.status === 403) throw new Forbidden("Firestore に アクセスできません");
     if (!res.ok) throw new Error("クラウドに つながりませんでした (" + res.status + ")");
     return res.json();
   }
-  const getUserDoc = async () => unfields(await fs("GET"));
+  const getHousehold = async (opt) => unfields(await fs("GET", "", opt));
   async function listDevices() {
     const out = [];
     let pageToken = "";
@@ -184,7 +186,15 @@
   // ---------- 同期 ----------
   async function syncOnce() {
     const seen = (st.seen = st.seen || { resets: {}, wipedAt: 0 });
-    const doc = await getUserDoc();
+    const myGen = gen;
+    let doc;
+    try { doc = await getHousehold(); }
+    catch (e) {
+      if (e instanceof Forbidden && myGen === gen) return kicked(); // おうちから外された
+      throw e;
+    }
+    if (myGen !== gen) return;
+    if (!doc || !doc.members || !doc.members[st.uid]) return kicked();
     const now = Date.now();
 
     // 1) ほかの端末で「クラウドのデータをぜんぶ消す」が押されていた → この端末のこども・記録も消す
@@ -218,10 +228,10 @@
     }
     putJ(K.local, L);
 
-    // 4) ほかの端末のぶんを合計
-    const devices = await listDevices();
+    // 4) ほかの端末のぶんを合計（外した端末の記録も、遊んだぶんとして数える）
+    const docs = await listDevices();
     const R = {};
-    for (const d of devices) {
+    for (const d of docs) {
       if (d.id === st.deviceId) continue;
       const t = d.updatedAt || 0;
       if (t < wipedAt) continue; // ぜんぶ消す より前の記録は使わない
@@ -234,8 +244,12 @@
         for (const [g, s] of Object.entries(P.games || {})) if (!r.games[g] || s.t > r.games[g].t) r.games[g] = s;
       }
     }
-    devicesCount = devices.filter((d) => d.id !== st.deviceId && (d.updatedAt || 0) >= wipedAt).length + 1;
     putJ(K.remote, R);
+    const lastSeen = Object.fromEntries(docs.map((d) => [d.id, d.updatedAt || 0]));
+    devices = Object.entries(doc.members).map(([uid, m]) => ({
+      uid, deviceId: m.deviceId, name: m.name || "たんまつ", joinedAt: m.joinedAt || 0,
+      updatedAt: uid === st.uid ? now : lastSeen[m.deviceId] || 0, self: uid === st.uid,
+    })).sort((a, b) => a.joinedAt - b.joinedAt);
 
     // 5) 送る（こども一覧と、この端末のぶん）
     await fs("PATCH", "", {
@@ -250,8 +264,20 @@
     EG.stars.refresh(false);
   }
 
+  /** この端末が おうちから外された → 記録はゲストとして端末に残す */
+  function kicked() {
+    st = { deviceId: st.deviceId, deviceName: st.deviceName };
+    save();
+    devices = [];
+    putJ(K.remote, {}); putJ(K.deleted, {});
+    EG.mode.set("guest");
+    error = "";
+    emit();
+    window.dispatchEvent(new Event("eg:kicked"));
+  }
+
   async function syncNow() {
-    if (!st.uid) return;
+    if (!st.uid || !st.joined) return;
     if (busy) { again = true; return busy; }
     busy = (async () => {
       emit();
@@ -268,60 +294,110 @@
   let timer;
   const syncSoon = (ms = 2000) => { clearTimeout(timer); timer = setTimeout(syncNow, ms); };
 
-  // ---------- ログイン・ログアウト ----------
-  /**
-   * ログインする（1台目は入力、2台目以降は QR）
-   * @returns {{sameAccount:boolean}}  前と同じアカウントなら true
-   */
-  async function login(c) {
-    const auth = await signIn(c);
-    gen++;
-    const prevUid = st.uid;
-    const prev = st;
-    st = Object.assign({ deviceId: prev.deviceId }, c, auth, { seen: prev.uid === auth.uid ? prev.seen : null, needRelogin: false });
-    save();
-    // Firestore が使えるか確認し、ログインより前のリセット・全消しは この端末に当てはめない
-    try {
-      const doc = await getUserDoc();
-      if (prevUid !== auth.uid) st.seen = { resets: Object.assign({}, doc.resets || {}), wipedAt: doc.wipedAt || 0 };
-      save();
-    } catch (e) {
-      st = prev; save();
-      throw e;
+  // ---------- おうちを作る・参加する ----------
+  /** 同じ Firebase なら今の匿名アカウントを使い回す */
+  async function ensureAuth(c) {
+    if (st.uid && st.apiKey === c.apiKey && st.projectId === c.projectId && st.refreshToken) {
+      try { await token(); return { uid: st.uid, idToken: st.idToken, refreshToken: st.refreshToken, expiresAt: st.expiresAt }; }
+      catch (e) { if (e.message === OFFLINE) throw e; }
     }
+    return signUpAnon(c.apiKey);
+  }
+  const deviceName = () => st.deviceName || autoDeviceName();
+  const member = (uid) => ({ [uid]: { deviceId: st.deviceId, name: deviceName(), joinedAt: Date.now() } });
+  function adopt(c, auth, doc, sameHousehold) {
+    gen++;
+    const prev = st;
+    st = Object.assign({ deviceId: prev.deviceId, deviceName: deviceName() }, c, auth, {
+      joined: true,
+      seen: sameHousehold && prev.seen ? prev.seen : { resets: Object.assign({}, doc.resets || {}), wipedAt: doc.wipedAt || 0 },
+      lastSync: sameHousehold ? prev.lastSync : 0,
+    });
+    save();
     error = "";
     emit();
-    return { sameAccount: prevUid === auth.uid };
   }
-  const loginWithQr = (text) => login(parseQr(text));
 
-  /** QR を作り直す：パスワードをランダムに変える → 古い QR・ほかの端末のログインは無効 */
+  /** 1台目：おうちを作る */
+  async function createHousehold(cfg) {
+    const auth = await ensureAuth(cfg);
+    const c = Object.assign({}, cfg, { hid: EG.randomId(20), key: EG.randomId(32, KEY_CHARS) });
+    const doc = { key: c.key, members: member(auth.uid), schemaVersion: EG.SCHEMA_VERSION, profiles: {}, deleted: {}, resets: {}, wipedAt: 0 };
+    try {
+      await fs("PATCH", "", { c, idToken: auth.idToken, body: { fields: fields(doc) }, query: "currentDocument.exists=false" });
+    } catch (e) {
+      throw e instanceof Forbidden ? new Error("Firestore に書きこめません。ルールを はりつけて「公開」したか 確認してください") : e;
+    }
+    adopt(c, auth, doc, false);
+    return { sameAccount: false };
+  }
+
+  /** 2台目以降：QR でおうちに参加する */
+  async function join(c) {
+    const same = st.hid === c.hid && !!st.joined;
+    const auth = await ensureAuth(c);
+    try {
+      await fs("PATCH", "", {
+        c, idToken: auth.idToken,
+        body: { fields: fields({ members: member(auth.uid), joinKey: c.key }) },
+        mask: ["members." + auth.uid, "joinKey"],
+      });
+    } catch (e) {
+      if (e instanceof Forbidden) throw new Error("この QR は つかえません（あたらしい QR に なっているかも しれません）");
+      throw e;
+    }
+    const doc = await getHousehold({ c, idToken: auth.idToken });
+    adopt(c, auth, doc, same);
+    return { sameAccount: same };
+  }
+  const joinWithQr = (text) => join(parseQr(text));
+
+  /** QR を作り直す：合言葉を変える（参加ずみの端末はそのまま。古い QR では参加できない） */
   async function regenerate() {
-    const fresh = await signIn(st); // パスワード変更には「さっきログインした」トークンが必要
-    const password = EG.randomId(28, "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789");
-    const j = await authCall(st.apiKey, "accounts:update", { idToken: fresh.idToken, password, returnSecureToken: true });
-    Object.assign(st, { password, idToken: j.idToken, refreshToken: j.refreshToken, expiresAt: Date.now() + (+j.expiresIn) * 1000, needRelogin: false });
-    save();
-    emit();
+    const key = EG.randomId(32, KEY_CHARS);
+    await fs("PATCH", "", { body: { fields: fields({ key }) }, mask: ["key"] });
+    st.key = key; save(); emit();
   }
 
-  /** クラウドのデータをぜんぶ消す（Firebase のアカウント・設定は残る） */
+  /** ほかの端末を外す（その端末で遊んだ記録は残る） */
+  async function removeDevice(uid) {
+    if (uid === st.uid) throw new Error("この たんまつ は ここでは はずせません");
+    await fs("PATCH", "", { body: { fields: {} }, mask: ["members." + uid] });
+    await syncNow();
+  }
+  /** 端末の名前を変える */
+  async function renameDevice(uid, name) {
+    const m = devices.find((d) => d.uid === uid);
+    if (!m) return;
+    const nm = String(name || "").trim().slice(0, 20) || "たんまつ";
+    await fs("PATCH", "", { body: { fields: { members: enc({ [uid]: { deviceId: m.deviceId, name: nm, joinedAt: m.joinedAt } }) } }, mask: ["members." + uid] });
+    if (uid === st.uid) { st.deviceName = nm; save(); }
+    await syncNow();
+  }
+  /** この端末が おうちから抜ける（この端末のデータをぜんぶ消す ときに使う） */
+  async function leave() {
+    if (!st.uid || !st.joined) return;
+    try { await fs("PATCH", "", { body: { fields: {} }, mask: ["members." + st.uid] }); } catch { /* オフラインでも消す */ }
+  }
+
+  /** クラウドのデータをぜんぶ消す（おうち・参加している端末・合言葉は残る） */
   async function wipeCloud() {
-    const devices = await listDevices();
-    for (const d of devices) await fs("DELETE", "/devices/" + d.id);
+    const docs = await listDevices();
+    for (const d of docs) await fs("DELETE", "/devices/" + d.id);
     const now = Date.now();
-    // ドキュメントを丸ごと置きかえる（ほかの端末は wipedAt を見て消す）
-    await fs("PATCH", "", { body: { fields: fields({ schemaVersion: EG.SCHEMA_VERSION, profiles: {}, deleted: {}, resets: {}, wipedAt: now }) } });
+    await fs("PATCH", "", {
+      body: { fields: fields({ schemaVersion: EG.SCHEMA_VERSION, profiles: {}, deleted: {}, resets: {}, wipedAt: now }) },
+      mask: ["schemaVersion", "profiles", "deleted", "resets", "wipedAt"],
+    });
     st.seen = { resets: {}, wipedAt: now };
     save();
     putJ(K.profiles, {}); putJ(K.deleted, {}); putJ(K.local, {}); putJ(K.remote, {});
     EG.profiles.unselect();
-    devicesCount = 1;
     emit();
   }
 
   async function onReset(pids) {
-    if (!st.uid) return;
+    if (!st.uid || !st.joined) return;
     const now = Date.now();
     try {
       await fs("PATCH", "", {
@@ -336,13 +412,14 @@
   }
 
   EG.cloud = {
-    parseConfig, parseQr, login, loginWithQr, regenerate, wipeCloud, syncNow, qrPayload,
-    isLoggedIn: () => !!st.uid,
+    parseConfig, parseQr, createHousehold, join, joinWithQr, regenerate, removeDevice, renameDevice, leave, wipeCloud, syncNow, qrPayload,
+    isLoggedIn: () => !!(st.uid && st.joined),
+    devices: () => devices.slice(),
     state: () => ({
-      loggedIn: !!st.uid, email: st.email || "", projectId: st.projectId || "", deviceId: st.deviceId,
-      devices: devicesCount || 1, lastSync: st.lastSync || 0, error, busy: !!busy, needRelogin: !!st.needRelogin,
+      loggedIn: !!(st.uid && st.joined), projectId: st.projectId || "", deviceId: st.deviceId, deviceName: deviceName(),
+      devices: devices.length || 1, lastSync: st.lastSync || 0, error, busy: !!busy,
     }),
-    debug: () => ({ uid: st.uid, deviceId: st.deviceId, projectId: st.projectId, email: st.email, lastSync: st.lastSync, seen: st.seen, needRelogin: !!st.needRelogin }),
+    debug: () => ({ uid: st.uid, deviceId: st.deviceId, projectId: st.projectId, hid: st.hid, lastSync: st.lastSync, seen: st.seen }),
   };
 
   // ---------- いつ同期するか ----------
@@ -350,5 +427,5 @@
   window.addEventListener("eg:reset", (e) => onReset(e.detail.pids));
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncSoon(300); });
   window.addEventListener("online", () => syncSoon(300));
-  if (st.uid && EG.mode.get() === "cloud") syncSoon(300);
+  if (st.uid && st.joined && EG.mode.get() === "cloud") syncSoon(300);
 })();

@@ -52,8 +52,8 @@
   $("l-scan").onclick = () => { EG.sfx.tap(); startScan(); };
   $("l-setup").onclick = () => { EG.sfx.tap(); go("setup"); };
 
-  /** ログインしたあとの共通処理（この端末のこどもを引きつぐか聞く） */
-  async function afterLogin(cloud, loginFn) {
+  /** おうちに入ったあとの共通処理（この端末のこどもを引きつぐか聞く） */
+  async function afterLogin(cloud, loginFn, { created = false } = {}) {
     const hadKids = EG.profiles.list().length;
     const res = await loginFn();
     if (!res.sameAccount) {
@@ -65,8 +65,9 @@
     }
     EG.mode.set("cloud");
     await cloud.syncNow();
-    EG.toast("ログインしました");
+    EG.toast(created ? "おうちを つくりました" : "ログインしました");
     route();
+    if (created) openAdult({ firstQr: true }); // QR を保存してもらう
   }
 
   // ---------- ③ QR 読み取り ----------
@@ -116,7 +117,7 @@
         try {
           const cloud = await EG.loadCloud();
           const c = cloud.parseQr(text);
-          await afterLogin(cloud, () => cloud.login(c));
+          await afterLogin(cloud, () => cloud.join(c));
         } catch (e) {
           msg.textContent = e.message;
           EG.sfx.wrong();
@@ -144,8 +145,8 @@
     try {
       const cloud = await EG.loadCloud();
       const c = cloud.parseQr(text);
-      if (!confirm("この QR で ログインしますか？\n" + c.email)) return false;
-      await afterLogin(cloud, () => cloud.login(c));
+      if (!confirm("この QR の おうちに はいりますか？")) return false;
+      await afterLogin(cloud, () => cloud.join(c));
       return true;
     } catch (e) { alert(e.message); return false; }
   }
@@ -155,19 +156,17 @@
     e.preventDefault();
     const btn = $("f-submit");
     $("f-err").textContent = "";
-    btn.disabled = true; btn.textContent = "ログインしています…";
+    btn.disabled = true; btn.textContent = "つくっています…";
     try {
       const cloud = await EG.loadCloud();
       if (!cloud) throw new Error("よみこみに しっぱいしました");
       const cfg = cloud.parseConfig($("f-config").value);
-      const email = $("f-email").value.trim(), password = $("f-pass").value;
-      if (!email || !password) throw new Error("メールアドレスと パスワードを 入れてください");
-      await afterLogin(cloud, () => cloud.login(Object.assign(cfg, { email, password })));
-      $("f-pass").value = "";
+      await afterLogin(cloud, () => cloud.createHousehold(cfg), { created: true });
+      $("f-config").value = "";
     } catch (err) {
       $("f-err").textContent = err.message;
     } finally {
-      btn.disabled = false; btn.textContent = "ログイン";
+      btn.disabled = false; btn.textContent = "おうちを つくる";
     }
   });
 
@@ -297,11 +296,14 @@
   const dlg = $("adult");
   EG.adultLock($("games-gear"), openAdult);
   EG.adultLock($("who-gear"), openAdult);
+  EG.adultLock($("newkid-gear"), openAdult);
   $("a-close").onclick = () => dlg.close();
-  function openAdult() {
+  function openAdult({ firstQr = false } = {}) {
     fillAdult();
-    $("a-qr-box").hidden = true;
-    dlg.showModal();
+    $("a-qr-box").hidden = !firstQr;
+    $("a-qr-first").hidden = !firstQr;
+    if (!dlg.open) dlg.showModal();
+    if (firstQr) renderQr().then(() => $("a-qr").scrollIntoView({ block: "center" }));
   }
   function fillAdult() {
     $("s-sound").checked = EG.settings.sound;
@@ -370,38 +372,83 @@
     const s = EG.cloud.state();
     $("a-cloud-info").innerHTML = "";
     $("a-cloud-info").append(
-      `ログイン中：${s.email}`, document.createElement("br"),
       `Firebase：${s.projectId}`, document.createElement("br"),
-      `つながっている たんまつ：${s.devices}だい`, document.createElement("br"),
+      `この たんまつ：${s.deviceName}`, document.createElement("br"),
       `さいごに どうき：${s.busy ? "どうき中…" : fmtTime(s.lastSync)}`
     );
     $("a-cloud-err").textContent = s.error;
-    $("a-rescan").hidden = !s.needRelogin;
-    $("a-showqr").disabled = s.needRelogin;
+    fillDevices();
+  }
+  function fillDevices() {
+    const box = $("a-devices");
+    box.innerHTML = "";
+    const list = EG.cloud.devices();
+    if (!list.length) { box.innerHTML = `<p class="note">「いま どうき」を おすと ひょうじされます</p>`; return; }
+    list.forEach((d) => {
+      const row = document.createElement("div");
+      row.className = "a-kid";
+      row.style.setProperty("--kc", d.self ? "#2ecc71" : "#cfc6bd");
+      row.innerHTML = `<span class="ic">📱</span><span class="nm"><span class="n"></span><span class="meta"></span></span><button class="rn">なまえ</button>`;
+      row.querySelector(".n").textContent = d.name + (d.self ? "（この たんまつ）" : "");
+      row.querySelector(".meta").textContent = "さいごに どうき：" + fmtTime(d.updatedAt);
+      row.querySelector(".rn").onclick = async () => {
+        const nm = prompt("たんまつの なまえ", d.name);
+        if (nm === null) return;
+        try { await EG.cloud.renameDevice(d.uid, nm); } catch (e) { alert(e.message); }
+        fillAdult();
+      };
+      if (!d.self) {
+        const del = document.createElement("button");
+        del.className = "del"; del.textContent = "はずす";
+        del.onclick = async () => {
+          if (!confirm(`「${d.name}」を おうちから はずしますか？\n（その たんまつで あそんだ ほしは のこります）`)) return;
+          try { await EG.cloud.removeDevice(d.uid); EG.toast("はずしました"); } catch (e) { alert(e.message); }
+          fillAdult();
+        };
+        row.appendChild(del);
+      }
+      box.appendChild(row);
+    });
   }
   $("a-login").onclick = () => { dlg.close(); go("login"); };
   $("a-sync").onclick = async (e) => { const btn = e.currentTarget; btn.disabled = true; await EG.cloud.syncNow(); btn.disabled = false; fillAdult(); };
   $("a-showqr").onclick = async () => {
     const box = $("a-qr-box");
     box.hidden = !box.hidden;
+    $("a-qr-first").hidden = true;
     if (!box.hidden) await renderQr();
   };
+  let qrUrl = "";
   async function renderQr() {
     if (!window.qrcode) await EG.loadScript("shared/vendor/qrcode.js");
     const qr = qrcode(0, "M");
     qr.addData(EG.cloud.qrPayload());
     qr.make();
-    $("a-qr").innerHTML = qr.createSvgTag({ cellSize: 5, margin: 3, scalable: true });
+    qrUrl = qr.createDataURL(8, 4); // 長押しで保存できるように <img> にする
+    $("a-qr").src = qrUrl;
   }
+  $("a-saveqr").onclick = () => {
+    const a = document.createElement("a");
+    a.href = qrUrl;
+    a.download = "asobi-hiroba-qr.gif";
+    document.body.appendChild(a); a.click(); a.remove();
+    EG.toast("ほぞん できないときは、QR を ながおし して ほぞん してください", 3500);
+  };
   $("a-regen").onclick = async (e) => {
-    if (!doubleConfirm("QR を つくりなおします。ふるい QR は つかえなくなり、ほかの たんまつは あたらしい QR で ログインしなおしが ひつようです。")) return;
+    if (!doubleConfirm("QR を つくりなおします。ふるい QR では あたらしく はいれなく なります（いま つながっている たんまつは そのまま）。")) return;
     const btn = e.currentTarget;
     btn.disabled = true;
-    try { await EG.cloud.regenerate(); await renderQr(); EG.toast("あたらしい QR に なりました"); }
+    try { await EG.cloud.regenerate(); await renderQr(); EG.toast("あたらしい QR に なりました。ほぞん しなおしてください", 3500); }
     catch (err) { alert(err.message); }
     finally { btn.disabled = false; }
   };
-  $("a-rescan").onclick = () => { dlg.close(); startScan(); };
+
+  // おうちから外されたとき
+  window.addEventListener("eg:kicked", () => {
+    if (dlg.open) dlg.close();
+    alert("この たんまつは おうちから はずされました。\nあそんだ きろくは ゲストとして この たんまつに のこります。");
+    route();
+  });
 
   // デバッグ
   async function fillDebug() {
@@ -417,6 +464,7 @@
       ["データの かたち", "v" + EG.SCHEMA_VERSION],
       ["ログイン", c.uid ? "はい" : "いいえ"],
       ["Firebase", c.projectId || "—"],
+      ["おうちID", c.hid ? c.hid.slice(0, 4) + "…" : "—"],
       ["さいごに どうき", fmtTime(c.lastSync)],
       ["けされにくい ほぞん", persisted],
     ];
@@ -434,7 +482,7 @@
         try { v = JSON.parse(v); } catch { /* 文字列のまま */ }
         if (k === "eg.cloud" && v && typeof v === "object") {
           v = Object.assign({}, v);
-          ["password", "idToken", "refreshToken", "apiKey"].forEach((x) => { if (v[x]) v[x] = "（ひみつ）"; });
+          ["key", "idToken", "refreshToken", "apiKey"].forEach((x) => { if (v[x]) v[x] = "（ひみつ）"; });
         }
         out[k] = v;
       });
@@ -453,7 +501,8 @@
     return (v || "").trim() === "けす";
   }
   $("d-local").onclick = async () => {
-    if (!doubleConfirm("この たんまつの データ（ログイン・こども・ほし・せってい）を ぜんぶ けします。" + (EG.mode.get() === "cloud" ? "クラウドの データは のこります。" : ""))) return;
+    if (!doubleConfirm("この たんまつの データ（ログイン・こども・ほし・せってい）を ぜんぶ けします。" + (EG.mode.get() === "cloud" ? "クラウドの データは のこります（この たんまつは おうちから ぬけます）。" : ""))) return;
+    if (EG.cloud && EG.cloud.isLoggedIn()) await EG.cloud.leave();
     await EG.wipeLocal();
     location.replace(location.pathname);
   };
@@ -466,8 +515,8 @@
     finally { btn.disabled = false; }
   };
   $("d-all").onclick = async () => {
-    if (!doubleConfirm("クラウドと この たんまつの データを ぜんぶ けして、さいしょの がめんに もどります。（Firebase の プロジェクトと アカウントは のこります）")) return;
-    try { await EG.cloud.wipeCloud(); } catch (err) { if (!confirm(err.message + "\nこの たんまつ だけ けしますか？")) return; }
+    if (!doubleConfirm("クラウドと この たんまつの データを ぜんぶ けして、さいしょの がめんに もどります。（Firebase の プロジェクトは のこります）")) return;
+    try { await EG.cloud.wipeCloud(); await EG.cloud.leave(); } catch (err) { if (!confirm(err.message + "\nこの たんまつ だけ けしますか？")) return; }
     await EG.wipeLocal();
     location.replace(location.pathname);
   };
@@ -478,6 +527,8 @@
   // ---------- はじめる ----------
   (async () => {
     await EG.cloudReady;
+    // 旧方式（メール＋パスワード）のままの端末などは ゲストにもどす
+    if (EG.mode.get() === "cloud" && !(EG.cloud && EG.cloud.isLoggedIn())) EG.mode.set("guest");
     if (await handleJoinHash()) return;
     route();
   })();

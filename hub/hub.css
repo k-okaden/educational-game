@@ -134,7 +134,10 @@ dialog select { font: inherit; font-size: 17px; max-width: 60%; padding: 8px; bo
 .a-kid button { min-height: 48px; padding: 6px 12px; font-size: 16px; border-radius: 14px; background: #fff; box-shadow: 0 3px 0 rgba(0,0,0,.08); }
 .a-kid button.del { color: #d63031; }
 .qr-box { margin-top: 12px; }
-.qr { width: 220px; margin: 0 auto; background: #fff; }
+.qr { display: block; width: 220px; height: 220px; margin: 0 auto; background: #fff; image-rendering: pixelated; }
+.center { text-align: center; }
+.lbl2 { margin: 16px 0 6px; font-weight: 700; color: var(--ink-soft); }
+.a-kid .meta { font-size: 13px; color: var(--ink-soft); font-weight: 600; display: block; }
 .dbg { width: 100%; border-collapse: collapse; font-size: 14px; }
 .dbg td { padding: 6px 4px; border-bottom: 1px solid #f3eee9; word-break: break-all; }
 .dbg td:first-child { color: var(--ink-soft); white-space: nowrap; width: 40%; }

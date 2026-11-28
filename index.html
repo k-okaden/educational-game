@@ -38,7 +38,7 @@
       <button class="choice wide" id="l-scan" style="--c:#2ecc71">
         <span class="e">📷</span><b>QRを よみとる</b><small>2だいめ からは これだけ</small>
       </button>
-      <button class="link-btn" id="l-setup">はじめての たんまつ：Firebase を せっていする</button>
+      <button class="link-btn" id="l-setup">はじめての たんまつ：Firebase を せっていして おうちを つくる</button>
       <p class="note">クラウドに ほぞんするには、おうちの Firebase（むりょう）が ひつようです。<a href="docs/cloud-sync.md" target="_blank" rel="noopener">せっていの しかた</a></p>
     </div>
   </section>
@@ -59,14 +59,8 @@
       <label>firebaseConfig（コンソールの「マイアプリ」から まるごとコピー）
         <textarea id="f-config" rows="6" spellcheck="false" placeholder='const firebaseConfig = {&#10;  apiKey: "...",&#10;  projectId: "...",&#10;  ...&#10;};'></textarea>
       </label>
-      <label>メールアドレス（Firebase で作った おうちの アカウント）
-        <input id="f-email" type="email" autocapitalize="off" spellcheck="false" />
-      </label>
-      <label>パスワード
-        <input id="f-pass" type="password" />
-      </label>
       <p class="err" id="f-err"></p>
-      <button class="eg-btn primary" type="submit" id="f-submit">ログイン</button>
+      <button class="eg-btn primary" type="submit" id="f-submit">おうちを つくる</button>
       <p class="note">入力した内容は この たんまつ にだけ ほぞんされます。<a href="docs/cloud-sync.md" target="_blank" rel="noopener">せっていの しかた</a></p>
     </form>
   </section>
@@ -79,7 +73,7 @@
 
   <!-- ⑥ こどもを ふやす -->
   <section class="scr" id="scr-newkid" hidden>
-    <div class="topbar"><button class="eg-round-btn" data-back aria-label="もどる">⬅️</button><h2>なまえを おしえてね</h2><span class="sp"></span></div>
+    <div class="topbar"><button class="eg-round-btn" data-back aria-label="もどる">⬅️</button><h2>なまえを おしえてね</h2><button class="eg-round-btn" id="newkid-gear" aria-label="おとなメニュー">⚙️</button></div>
     <form class="col form" id="kid-form" autocomplete="off">
       <div class="kid-preview" id="kid-preview"><span></span></div>
       <input id="kid-name" class="kid-name" maxlength="8" placeholder="なまえ（ひらがな）" />
@@ -141,11 +135,16 @@
         <button class="eg-btn sub" id="a-showqr">📱 2だいめを つなぐ</button>
       </div>
       <div id="a-qr-box" class="qr-box" hidden>
-        <div id="a-qr" class="qr"></div>
-        <p class="warn">⚠️ この QR は「いえの かぎ」と おなじです。よみとると だれでも ログインできます。ほかの人に 見せないでください。</p>
-        <button class="eg-btn sub wide" id="a-regen">🔁 QRを つくりなおす（ふるい QR を つかえなくする）</button>
+        <p class="note" id="a-qr-first" hidden>🎉 おうちが できました！ この QR を ほぞん（いんさつ・スクリーンショット）しておいてください。</p>
+        <img id="a-qr" class="qr" alt="2だいめを つなぐ QR" />
+        <p class="note center">2だいめ：アプリを ひらく →「ログイン」→「QRを よみとる」</p>
+        <p class="warn">⚠️ この QR は「いえの かぎ」と おなじです。よみとると だれでも おうちに はいれます。ほかの人に 見せないでください。<br>
+          すべての たんまつを なくしたときも、この QR が あれば もとに もどせます。ほぞん しておいてください。</p>
+        <button class="eg-btn sub wide" id="a-saveqr">🖼 QRを がぞうで ほぞん</button>
+        <button class="eg-btn sub wide" id="a-regen">🔁 QRを つくりなおす（ふるい QR では はいれなく する）</button>
       </div>
-      <button class="eg-btn sub wide" id="a-rescan" hidden>📷 QRを よみとって ログインしなおす</button>
+      <p class="lbl2">つながっている たんまつ</p>
+      <div id="a-devices" class="a-kids"></div>
     </div>
 
     <h3>🛠 デバッグ</h3>

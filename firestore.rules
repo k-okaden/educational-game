@@ -1,16 +1,38 @@
 rules_version = '2';
-// あそびのひろば：クラウド同期用の Firestore セキュリティルール
+// あそびのひろば：クラウド保存用の Firestore セキュリティルール
 // Firebase コンソール → Firestore Database → ルール に、この内容をそのまま貼って「公開」する。
 //
-// ・ログインした本人の users/{uid} 以下だけ読み書きできる
+// ・データは「おうち」ごと：households/{おうちID}
+// ・おうちに参加している端末（members に入っている匿名アカウント）だけが読み書きできる
+// ・参加できるのは、合言葉（key）を知っている端末だけ（QR に入っている）
 // ・ゲームごとの項目はここに書かない → ゲームが増えても このルールは変えなくてよい
-// ・アカウントは Firebase コンソールで作ったものだけ（新規登録はオフにする：docs/cloud-sync.md）
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    match /households/{hid} {
+      function signedIn() { return request.auth != null; }
+      function isMember() { return signedIn() && request.auth.uid in resource.data.members; }
+
+      // 参加している端末は読める・更新できる・消せる
+      allow get: if isMember();
+      allow update, delete: if isMember();
+
+      // おうちを作る：参加者は自分だけ、合言葉は十分に長い
+      allow create: if signedIn()
+        && request.resource.data.members.keys().hasOnly([request.auth.uid])
+        && request.resource.data.key is string
+        && request.resource.data.key.size() >= 24;
+
+      // 参加する：自分を members に足すだけ、かつ 送った合言葉（joinKey）が key と同じ
+      allow update: if signedIn()
+        && !(request.auth.uid in resource.data.members)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'joinKey'])
+        && request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([request.auth.uid])
+        && request.resource.data.joinKey == resource.data.key;
+
+      // 端末ごとの記録など（おうちの下）：参加している端末だけ
       match /{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
+        allow read, write: if signedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/households/$(hid)).data.members;
       }
     }
   }

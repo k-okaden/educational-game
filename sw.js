@@ -4,7 +4,7 @@
  * ネットにつながっていれば最新版を取りにいく（stale-while-revalidate）。
  * ファイル一覧を書かなくていいので、ゲームを足しても修正不要。
  */
-const CACHE = "eg-v4"; // 中身を大きく変えたら上げる（古いキャッシュを消す）
+const CACHE = "eg-v5"; // 中身を大きく変えたら上げる（古いキャッシュを消す）
 const CORE = ["./", "./index.html", "./hub/hub.css", "./hub/hub.js", "./shared/core.css", "./shared/core.js", "./shared/cloud.js", "./games/registry.js", "./manifest.webmanifest", "./icons/icon.svg"];
 
 self.addEventListener("install", (e) => {
