@@ -10,8 +10,13 @@
   const { getJ, putJ } = EG.storage;
   const K = EG.KEYS;
 
-  const ICONS = ["🐶", "🐱", "🐰", "🐻", "🐼", "🐨", "🦁", "🐯", "🐸", "🐵", "🐧", "🐤", "🦊", "🐮", "🐷", "🐙", "🦄", "🦖", "🐳", "🐞", "🌻", "🍓", "🚀", "⭐"];
+  const ICONS = ["🐶", "🐱", "🐰", "🐻", "🐼", "🦁", "🐸", "🐧", "🐤", "🦊", "🦄", "🦖", "🐳", "🍓", "🚀", "⭐"];
   const COLORS = ["#4f8ff7", "#ff9f43", "#2ecc71", "#ff6fa5", "#a66cff", "#ffc93c", "#1abc9c", "#ff6b6b"];
+
+  // ---------- 1画面に収める（スクロールしない） ----------
+  document.querySelectorAll("[data-fit]").forEach((el) => EG.fit(el, { fill: true }));
+  const fitKids = EG.gridFit(document.getElementById("kids"), () => EG.profiles.list().length + 1, { gap: 24, ratio: 1.3, max: 240 });
+  const fitGames = EG.gridFit(document.getElementById("grid"), () => window.EG_GAMES.filter((g) => !g.hidden).length, { gap: 24, ratio: 1, max: 300 });
 
   // ---------- 画面の切りかえ ----------
   let cur = "";
@@ -190,6 +195,7 @@
     add.innerHTML = `<span class="face">＋</span><b>ふやす</b><small>&nbsp;</small>`;
     add.onclick = () => { EG.sfx.tap(); go("newkid"); };
     box.appendChild(add);
+    fitKids();
   }
 
   // ---------- ⑥ こどもを ふやす ----------
@@ -264,6 +270,7 @@
     });
     updateStars();
     updateSyncDot();
+    fitGames();
   }
   function updateStars() {
     grid.querySelectorAll(".card").forEach((a) => {
@@ -288,22 +295,40 @@
   window.addEventListener("eg:data", () => {
     if (cur === "games") { if (!EG.profiles.current()) route(); else updateStars(); }
     else if (cur === "who") renderWho();
-    if ($("adult").open) fillAdult();
+    if (isOpen()) fillAdult();
   });
-  window.addEventListener("eg:cloud", () => { updateSyncDot(); if ($("adult").open) fillCloud(); });
+  window.addEventListener("eg:cloud", () => { updateSyncDot(); if (isOpen()) fillCloud(); });
 
   // ---------- おとなメニュー ----------
   const dlg = $("adult");
+  const isOpen = () => dlg.hasAttribute("open");
   EG.adultLock($("games-gear"), openAdult);
   EG.adultLock($("who-gear"), openAdult);
   EG.adultLock($("newkid-gear"), openAdult);
-  $("a-close").onclick = () => dlg.close();
+  $("a-close").onclick = () => EG.closeDialog(dlg);
+  // タブ
+  function selectTab(name) {
+    dlg.querySelectorAll("#a-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
+    dlg.querySelectorAll(".pane").forEach((p) => (p.hidden = p.dataset.pane !== name));
+  }
+  $("a-tabs").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-tab]");
+    if (!b) return;
+    EG.sfx.tap();
+    selectTab(b.dataset.tab);
+  });
   function openAdult({ firstQr = false } = {}) {
     fillAdult();
-    $("a-qr-box").hidden = !firstQr;
+    showQrView(firstQr);
     $("a-qr-first").hidden = !firstQr;
-    if (!dlg.open) dlg.showModal();
-    if (firstQr) renderQr().then(() => $("a-qr").scrollIntoView({ block: "center" }));
+    selectTab(firstQr ? "cloud" : "sound");
+    EG.openDialog(dlg);
+  }
+  /** クラウドのタブの中で「QR を見せる画面」と「ふつうの画面」を切りかえる */
+  function showQrView(on) {
+    $("a-qr-box").hidden = !on;
+    $("a-cloud-main").hidden = on;
+    if (on) renderQr();
   }
   function fillAdult() {
     $("s-sound").checked = EG.settings.sound;
@@ -357,7 +382,7 @@
       box.appendChild(row);
     });
   }
-  $("a-addkid").onclick = () => { dlg.close(); go("newkid"); };
+  $("a-addkid").onclick = () => { EG.closeDialog(dlg); go("newkid"); };
   $("a-reset-all").onclick = () => {
     if (confirm("ぜんいんの ほしを 0 に しますか？")) { EG.stars.reset(); fillAdult(); }
   };
@@ -410,14 +435,10 @@
       box.appendChild(row);
     });
   }
-  $("a-login").onclick = () => { dlg.close(); go("login"); };
+  $("a-login").onclick = () => { EG.closeDialog(dlg); go("login"); };
   $("a-sync").onclick = async (e) => { const btn = e.currentTarget; btn.disabled = true; await EG.cloud.syncNow(); btn.disabled = false; fillAdult(); };
-  $("a-showqr").onclick = async () => {
-    const box = $("a-qr-box");
-    box.hidden = !box.hidden;
-    $("a-qr-first").hidden = true;
-    if (!box.hidden) await renderQr();
-  };
+  $("a-showqr").onclick = () => { EG.sfx.tap(); $("a-qr-first").hidden = true; showQrView(true); };
+  $("a-qr-back").onclick = () => { EG.sfx.tap(); showQrView(false); };
   let qrUrl = "";
   async function renderQr() {
     if (!window.qrcode) await EG.loadScript("shared/vendor/qrcode.js");
@@ -445,7 +466,7 @@
 
   // おうちから外されたとき
   window.addEventListener("eg:kicked", () => {
-    if (dlg.open) dlg.close();
+    if (isOpen()) EG.closeDialog(dlg);
     alert("この たんまつは おうちから はずされました。\nあそんだ きろくは ゲストとして この たんまつに のこります。");
     route();
   });
@@ -510,7 +531,7 @@
     if (!doubleConfirm("クラウドの データ（すべての たんまつの こども・ほし・すすみぐあい）を ぜんぶ けします。")) return;
     const btn = e.currentTarget;
     btn.disabled = true;
-    try { await EG.cloud.wipeCloud(); EG.toast("クラウドの データを けしました"); dlg.close(); route(); }
+    try { await EG.cloud.wipeCloud(); EG.toast("クラウドの データを けしました"); EG.closeDialog(dlg); route(); }
     catch (err) { alert(err.message); }
     finally { btn.disabled = false; }
   };

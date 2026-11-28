@@ -18,6 +18,96 @@
   // このリポジトリのトップ（index.html がある場所）の URL
   EG.ROOT = (document.currentScript && document.currentScript.src.replace(/shared\/core\.js.*$/, "")) || "./";
 
+  // ---------- 画面の大きさ（スクロールなしで1画面に収めるため） ----------
+  // 100vh は iPad の Safari でアドレスバーの分ずれるので、実際の高さを CSS 変数 --app-h に入れる
+  const setAppHeight = () => document.documentElement.style.setProperty("--app-h", window.innerHeight + "px");
+  setAppHeight();
+  window.addEventListener("resize", setAppHeight);
+  window.addEventListener("orientationchange", () => setTimeout(setAppHeight, 300));
+
+  const onNextFrame = (fn) => { let q = false; return () => { if (q) return; q = true; requestAnimationFrame(() => { q = false; fn(); }); }; };
+  function watchSize(els, fn) {
+    if (window.ResizeObserver) { const ro = new ResizeObserver(fn); els.forEach((e) => ro.observe(e)); }
+    window.addEventListener("resize", fn);
+    window.addEventListener("orientationchange", () => setTimeout(fn, 350));
+  }
+
+  /**
+   * 中身を入れ物いっぱいに拡大・縮小する（はみ出さない・スクロールしない）
+   *   const stage = EG.fit(document.getElementById("stage"), { max: 3 });
+   *   stage.innerHTML = "...";   // ← 返ってきた内側の要素に中身を入れる
+   * @param {HTMLElement} box
+   * @param {{max?:number, min?:number, fill?:boolean}} opt
+   *   max  : 何倍まで大きくするか（1 なら縮めるだけ）
+   *   fill : 中身の幅を入れ物の幅にそろえる（折り返しのあるメニューやフォーム向け。高さだけで縮める）
+   * @returns {HTMLElement} 中身を入れる内側の要素
+   */
+  EG.fit = (box, { max = 1, min = 0.25, fill = false } = {}) => {
+    box.classList.add("eg-fit");
+    if (fill) box.classList.add("fill");
+    const inner = document.createElement("div");
+    inner.className = "eg-fit-inner";
+    while (box.firstChild) inner.appendChild(box.firstChild);
+    box.appendChild(inner);
+    const update = onNextFrame(() => {
+      const cw = box.clientWidth, ch = box.clientHeight;
+      const iw = inner.offsetWidth, ih = inner.offsetHeight;
+      if (!cw || !ch || !iw || !ih) return;
+      const sc = Math.max(min, Math.min(max, cw / iw, ch / ih));
+      inner.style.transform = "scale(" + sc.toFixed(4) + ")";
+    });
+    watchSize([box, inner], update);
+    if (window.MutationObserver) new MutationObserver(update).observe(inner, { childList: true, subtree: true, characterData: true });
+    inner.refit = update;
+    update();
+    return inner;
+  };
+
+  /**
+   * いくつかのカードを、スクロールせずに いちばん大きく並べる（列の数を自動で決める）
+   * 入れ物に CSS 変数 --cell（カードの幅）と --cols を入れる
+   * @param {HTMLElement} box
+   * @param {() => number} count  カードの数
+   * @param {{gap?:number, ratio?:number, max?:number}} opt  ratio = 高さ / 幅
+   */
+  EG.gridFit = (box, count, { gap = 24, ratio = 1, max = 320 } = {}) => {
+    const update = onNextFrame(() => {
+      const n = Math.max(1, count());
+      const cs = getComputedStyle(box);
+      const W = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const H = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const g = parseFloat(cs.columnGap) || gap;
+      if (W <= 0 || H <= 0) return;
+      let best = { size: 0, cols: 1 };
+      for (let c = 1; c <= n; c++) {
+        const r = Math.ceil(n / c);
+        const size = Math.min((W - g * (c - 1)) / c, (H - g * (r - 1)) / r / ratio, max);
+        if (size > best.size) best = { size, cols: c };
+      }
+      box.style.setProperty("--cell", Math.floor(best.size) + "px");
+      box.style.setProperty("--cols", best.cols);
+    });
+    watchSize([box], update);
+    return update;
+  };
+
+  /** <dialog> を開く・閉じる（古い Safari では代わりの表示にする） */
+  EG.openDialog = (dlg) => {
+    if (dlg.open) return;
+    if (typeof dlg.showModal === "function") return dlg.showModal();
+    dlg.classList.add("eg-dialog-fallback");
+    dlg.setAttribute("open", "");
+    const bd = document.createElement("div");
+    bd.className = "eg-dialog-backdrop";
+    dlg._bd = bd;
+    dlg.before(bd);
+  };
+  EG.closeDialog = (dlg) => {
+    if (typeof dlg.close === "function" && typeof dlg.showModal === "function") return dlg.close();
+    dlg.removeAttribute("open");
+    if (dlg._bd) { dlg._bd.remove(); dlg._bd = null; }
+  };
+
   // ---------- 便利関数 ----------
   EG.randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
   EG.shuffle = (arr) => {
@@ -478,7 +568,7 @@
     return blocks;
   };
 
-  /** 画面サイズとブロック数から、ちょうどいいブロックの大きさを決める */
+  /** （旧）画面サイズとブロック数から ブロックの大きさを決める。いまは EG.fit を使う */
   EG.blockSize = (count, cols = 5, maxW = window.innerWidth * 0.8, maxH = window.innerHeight * 0.32) => {
     const c = Math.min(cols, Math.max(count, 1));
     const r = Math.ceil(count / cols) || 1;

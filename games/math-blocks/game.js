@@ -57,11 +57,16 @@
   }
 
   const $ = (id) => document.getElementById(id);
-  const menu = $("menu"), play = $("play"), stage = $("stage"), eq = $("eq"), word = $("word"), choicesEl = $("choices"), progressEl = $("progress");
+  const menu = $("menu"), play = $("play"), eq = $("eq"), word = $("word"), choicesEl = $("choices"), progressEl = $("progress");
   const GAME_ID = OP;
   const OP_WORD = { add: "plus", sub: "minus", mul: "times" }[OP];
   const phrase = (q) => `${EG.numberWord(q.a)} ${OP_WORD} ${EG.numberWord(q.b)}`;
   let level = null, qIndex = 0, lastKey = "";
+  // 画面に合わせて拡大・縮小（スクロールしない）
+  EG.fit($("menu-fit"), { fill: true });
+  const stageBox = $("stage");
+  const stage = EG.fit(stageBox, { max: 3 });
+  const BLOCK = 44; // ブロックの基本の大きさ（EG.fit で画面に合わせて拡大される）
 
   document.title = CONFIG.title;
   EG.mountHeader({
@@ -116,15 +121,15 @@
 
     const view = drawers[OP](q);
     if (level.hint === "button") {
-      stage.classList.add("eg-hidden");
+      stageBox.classList.add("eg-hidden");
       const hb = document.createElement("button");
       hb.className = "eg-btn hint-btn";
       hb.textContent = "💡 ヒント";
-      hb.onclick = () => { EG.sfx.tap(); stage.classList.remove("eg-hidden"); hb.remove(); view.reveal?.(); };
-      stage.after(hb);
+      hb.onclick = () => { EG.sfx.tap(); stageBox.classList.remove("eg-hidden"); hb.remove(); view.reveal?.(); };
+      stageBox.after(hb);
       view.cleanup = () => hb.remove();
     } else {
-      stage.classList.remove("eg-hidden");
+      stageBox.classList.remove("eg-hidden");
       view.reveal?.();
     }
     speakQ();
@@ -133,7 +138,7 @@
     EG.renderChoices(choicesEl, EG.makeChoices(q.answer, 3, 0, max), q.answer, {
       onCorrect: async () => {
         view.cleanup?.();
-        stage.classList.remove("eg-hidden");
+        stageBox.classList.remove("eg-hidden");
         const qEl = eq.querySelector(".q");
         qEl.textContent = q.answer;
         qEl.classList.add("done");
@@ -156,11 +161,13 @@
     // たしざん：青と橙の2つのかたまり → 正解したら1つにがったい
     add(q) {
       stage.innerHTML = "";
-      const size = EG.blockSize(Math.max(q.a, q.b), 5, innerWidth * 0.36);
+      const size = BLOCK;
+      const row = Object.assign(document.createElement("div"), { className: "stage-row" });
       const ga = document.createElement("div");
       const op = Object.assign(document.createElement("div"), { className: "op", textContent: "+" });
       const gb = document.createElement("div");
-      stage.append(ga, op, gb);
+      row.append(ga, op, gb);
+      stage.appendChild(row);
       EG.renderBlocks(ga, [{ count: q.a, color: "a" }], { size });
       EG.renderBlocks(gb, [{ count: q.b, color: "b" }], { size, stagger: 60 });
       return {
@@ -168,7 +175,7 @@
           stage.innerHTML = "";
           const g = document.createElement("div");
           stage.appendChild(g);
-          const blocks = EG.renderBlocks(g, [{ count: q.a, color: "a" }, { count: q.b, color: "b" }], { size: EG.blockSize(q.answer), stagger: 30 });
+          const blocks = EG.renderBlocks(g, [{ count: q.a, color: "a" }, { count: q.b, color: "b" }], { size: BLOCK, stagger: 30 });
           await EG.wait(q.answer * 30 + 300);
           blocks.forEach((b, i) => setTimeout(() => { b.innerHTML = `<span class="num">${i + 1}</span>`; EG.sfx.pop(i); }, i * 70));
           await EG.wait(q.answer * 70 + 200);
@@ -181,7 +188,7 @@
       stage.innerHTML = "";
       const g = document.createElement("div");
       stage.appendChild(g);
-      const blocks = EG.renderBlocks(g, [{ count: q.a, color: "a" }], { size: EG.blockSize(q.a) });
+      const blocks = EG.renderBlocks(g, [{ count: q.a, color: "a" }], { size: BLOCK });
       const leaving = blocks.slice(q.a - q.b);
       let timer;
       return {
@@ -210,7 +217,7 @@
       const grid = document.createElement("div");
       grid.className = "mul-grid";
       stage.appendChild(grid);
-      const size = EG.blockSize(q.a * q.b, q.a, innerWidth * 0.7, innerHeight * 0.34);
+      const size = 36;
       const rows = [];
       for (let r = 0; r < q.b; r++) {
         const row = document.createElement("div");

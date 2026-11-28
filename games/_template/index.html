@@ -8,10 +8,13 @@
 </head>
 <body>
   <main class="eg-main">
-    <div id="progress"></div>
-    <div id="stage"></div>
-    <div class="eg-word" id="word"></div>
-    <div id="choices"></div>
+    <!-- .eg-play：縦向き・横向きに合わせて自動で並ぶ（スクロールしない） -->
+    <div class="eg-play">
+      <div id="progress"></div>
+      <div id="stage"></div>
+      <div class="eg-word" id="word"></div>
+      <div id="choices"></div>
+    </div>
   </main>
 
   <script src="../../shared/core.js"></script>
@@ -22,6 +25,8 @@
     let q = 0;
 
     EG.mountHeader({ title: "あたらしいゲーム" });
+    // ブロックなどは EG.fit の内側に入れる（画面に合わせて拡大・縮小される）
+    const stage = EG.fit(document.getElementById("stage"), { max: 3 });
 
     // ゲームごとのセーブデータ（こどもごと・クラウド同期も自動）。小さな JSON にする
     const saved = EG.save.get(GAME_ID) || { played: 0 };
@@ -34,7 +39,7 @@
       }
       EG.renderProgress(document.getElementById("progress"), q, ROUND);
       const n = EG.randInt(1, 10);
-      EG.renderBlocks(document.getElementById("stage"), [{ count: n, color: "a" }], { size: EG.blockSize(n) });
+      EG.renderBlocks(stage, [{ count: n, color: "a" }], { size: 48 });
       EG.say("How many?");
       EG.renderChoices(document.getElementById("choices"), EG.makeChoices(n, 3, 1, 10), n, {
         onCorrect: async () => {

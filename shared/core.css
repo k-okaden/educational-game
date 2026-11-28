@@ -18,6 +18,12 @@
   --bad: #ff6b6b;
   --accent: #ff6fa5;
 
+  /* 画面の高さ（core.js が window.innerHeight を入れる。Safari のアドレスバー分も正しく取れる） */
+  --app-h: 100vh;
+  /* 画面の短い方を基準にした単位（縦横どちらでも同じ見た目の大きさにする） */
+  --u: min(1vw, calc(var(--app-h) / 100));
+  --btn: clamp(48px, calc(var(--u) * 8), 64px);
+
   --font: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "M PLUS Rounded 1c",
     "Arial Rounded MT Bold", system-ui, sans-serif;
 }
@@ -26,7 +32,8 @@
 
 html, body {
   margin: 0;
-  height: 100%;
+  height: var(--app-h);
+  overflow: hidden; /* どの画面もスクロールしない（1画面に収める） */
   background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%) fixed;
   color: var(--ink);
   font-family: var(--font);
@@ -37,7 +44,7 @@ html, body {
   overscroll-behavior: none;
 }
 
-body { display: flex; flex-direction: column; min-height: 100dvh; }
+body { display: flex; flex-direction: column; }
 
 button {
   font-family: inherit;
@@ -52,7 +59,8 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: max(10px, env(safe-area-inset-top)) 16px 10px;
+  padding: max(8px, env(safe-area-inset-top)) 12px 6px;
+  flex: none;
 }
 .eg-header h1 {
   flex: 1;
@@ -61,44 +69,44 @@ button {
   text-align: center;
 }
 .eg-round-btn {
-  width: 64px;
-  height: 64px;
+  width: var(--btn);
+  height: var(--btn);
   border-radius: 50%;
   background: var(--card);
   box-shadow: var(--shadow);
-  font-size: 32px;
+  font-size: calc(var(--btn) * .5);
   display: grid;
   place-items: center;
   flex: none;
 }
 .eg-round-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(59,47,42,.15); }
 .eg-stars {
-  min-width: 64px;
-  height: 64px;
-  padding: 0 18px;
-  border-radius: 32px;
+  min-width: var(--btn);
+  height: var(--btn);
+  padding: 0 calc(var(--btn) * .28);
+  border-radius: 999px;
   background: var(--card);
   box-shadow: var(--shadow);
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 28px;
+  font-size: calc(var(--btn) * .44);
   font-weight: 700;
   flex: none;
 }
 .eg-stars.bump { animation: eg-bump .5s; }
 
 .eg-kid {
-  width: 64px; height: 64px; border-radius: 50%;
+  width: var(--btn); height: var(--btn); border-radius: 50%;
   background: var(--kc, #ddd);
   box-shadow: var(--shadow), inset 0 0 0 4px #fff;
-  display: grid; place-items: center; font-size: 36px; flex: none;
+  display: grid; place-items: center; font-size: calc(var(--btn) * .56); flex: none;
 }
 
 /* おとなロック：長押し中にリングがたまる */
 .eg-lock { position: relative; -webkit-user-select: none; user-select: none; touch-action: none; }
 .eg-lock::after {
-  content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  content: ""; position: absolute; top: -6px; right: -6px; bottom: -6px; left: -6px; border-radius: 50%;
   background: conic-gradient(var(--accent) calc(var(--p, 0) * 360deg), transparent 0);
   -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%);
   mask: radial-gradient(circle, transparent 62%, #000 63%);
@@ -138,7 +146,12 @@ button {
   gap: clamp(12px, 2.5vw, 28px);
   padding: 12px;
 }
-.eg-choices .eg-btn { min-width: clamp(120px, 20vw, 200px); min-height: clamp(110px, 16vw, 160px); font-size: clamp(48px, 8vw, 84px); }
+.eg-choices .eg-btn {
+  min-width: clamp(96px, calc(var(--u) * 19), 200px);
+  min-height: clamp(88px, calc(var(--u) * 14), 150px);
+  font-size: clamp(40px, calc(var(--u) * 8), 84px);
+  padding: 6px 16px;
+}
 
 /* ===== ブロック ===== */
 .eg-blocks {
@@ -165,7 +178,7 @@ button {
 .eg-block.gone::after {
   content: "";
   position: absolute;
-  inset: 20%;
+  top: 20%; right: 20%; bottom: 20%; left: 20%;
   background:
     linear-gradient(45deg, transparent 44%, #b3a69c 44% 56%, transparent 56%),
     linear-gradient(-45deg, transparent 44%, #b3a69c 44% 56%, transparent 56%);
@@ -174,7 +187,7 @@ button {
 .eg-block.tapped { animation: eg-bump .35s; }
 .eg-block .num {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   display: grid;
   place-items: center;
   color: #fff;
@@ -186,13 +199,45 @@ button {
 /* ===== パネル・画面 ===== */
 .eg-main {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(12px, 2.5vh, 28px);
-  padding: 8px 16px max(16px, env(safe-area-inset-bottom));
+  padding: 4px 16px max(12px, env(safe-area-inset-bottom));
 }
+.eg-main > section { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* ===== 画面に合わせて拡大・縮小する入れ物（EG.fit） ===== */
+.eg-fit { flex: 1; min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+.eg-fit-inner { flex: none; transform-origin: center center; }
+.eg-fit.fill > .eg-fit-inner { width: 100%; }
+
+/* ===== ゲーム画面の共通レイアウト（.eg-play） =====
+   縦向き：上から 進み具合・式・ブロック・ことば・答え
+   横向き：左に 式・ブロック・ことば、右に 答え（たて並び） */
+.eg-play {
+  flex: 1; min-height: 0; width: 100%;
+  display: grid;
+  gap: clamp(6px, calc(var(--u) * 1.4), 18px);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "prog" "eq" "stage" "word" "choices";
+  align-items: center;
+}
+.eg-play > .eg-progress, .eg-play > #progress { grid-area: prog; }
+.eg-play > .eq, .eg-play > #eq { grid-area: eq; justify-self: center; }
+.eg-play > .eg-fit, .eg-play > #stage { grid-area: stage; align-self: stretch; }
+.eg-play > .eg-word, .eg-play > #word { grid-area: word; }
+.eg-play > .eg-choices, .eg-play > #choices { grid-area: choices; }
+.eg-play > .hint-btn { grid-area: stage; place-self: center; }
+@media (min-aspect-ratio: 5/4) {
+  .eg-play {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "prog choices" "eq choices" "stage choices" "word choices";
+  }
+  .eg-play > .eg-choices, .eg-play > #choices { flex-direction: column; flex-wrap: nowrap; align-self: center; padding: 0 0 0 8px; }
+}
+
 .eg-panel {
   background: var(--card);
   border-radius: var(--radius);
@@ -202,7 +247,7 @@ button {
 .eg-hidden { display: none !important; }
 
 .eg-word {
-  font-size: clamp(28px, 5vw, 52px);
+  font-size: clamp(22px, calc(var(--u) * 5), 52px);
   font-weight: 700;
   color: var(--accent);
   letter-spacing: .04em;
@@ -220,7 +265,7 @@ button {
 /* ===== ごほうび画面 ===== */
 .eg-reward {
   position: fixed;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   display: grid;
   place-items: center;
   background: rgba(255, 248, 236, .92);
@@ -228,11 +273,11 @@ button {
   animation: eg-fade .3s;
 }
 .eg-reward .box { text-align: center; }
-.eg-reward .big { font-size: clamp(80px, 16vw, 160px); line-height: 1.1; animation: eg-bump .8s; }
-.eg-reward h2 { font-size: clamp(32px, 6vw, 56px); margin: 8px 0 24px; }
+.eg-reward .big { font-size: clamp(64px, calc(var(--u) * 16), 160px); line-height: 1.1; animation: eg-bump .8s; }
+.eg-reward h2 { font-size: clamp(28px, calc(var(--u) * 6), 56px); margin: 8px 0 calc(var(--u) * 3); }
 .eg-reward .row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
 
-#eg-confetti { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+#eg-confetti { position: fixed; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; z-index: 60; }
 
 /* ===== アニメーション ===== */
 @keyframes eg-pop { from { transform: scale(0); } 70% { transform: scale(1.15); } to { transform: scale(1); } }
@@ -244,3 +289,7 @@ button {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; }
 }
+
+/* ===== <dialog> がない古い Safari（iPadOS 15.4 未満）向け ===== */
+dialog.eg-dialog-fallback { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 90; margin: 0; }
+.eg-dialog-backdrop { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(59,47,42,.45); z-index: 89; }

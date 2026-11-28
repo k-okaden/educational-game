@@ -6,42 +6,45 @@
   <title>かぞえよう</title>
   <link rel="stylesheet" href="../../shared/core.css" />
   <style>
-    .menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 24px; width: min(960px, 100%); }
-    .menu .eg-btn { min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
-    .menu .eg-btn .e { font-size: 72px; }
-    .range { display: flex; gap: 16px; justify-content: center; }
-    .range .eg-btn { font-size: 28px; min-height: 72px; }
+    .menu { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 2.5); width: min(960px, 100%); margin: 0 auto; }
+    .menu .eg-btn { min-height: calc(var(--u) * 26); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 12px 8px; font-size: clamp(22px, calc(var(--u) * 4.4), 40px); }
+    .menu .eg-btn .e { font-size: calc(var(--u) * 10); line-height: 1.1; }
+    .range { display: flex; gap: 16px; justify-content: center; margin-bottom: calc(var(--u) * 3); }
+    .range .eg-btn { font-size: clamp(22px, calc(var(--u) * 4), 32px); min-height: 72px; }
     .range .eg-btn.on { background: var(--accent); color: #fff; }
 
-    .stage { min-height: 34vh; display: grid; place-items: center; width: 100%; }
-    .big-num { font-size: clamp(90px, 18vw, 180px); font-weight: 800; color: var(--accent); line-height: 1; animation: eg-pop .4s; }
-    .listen { font-size: 96px; width: 160px; height: 160px; border-radius: 50%; }
-    .choice-num { display: block; }
+    .big-num { font-size: 120px; font-weight: 800; color: var(--accent); line-height: 1; animation: eg-pop .4s; }
+    .listen { font-size: 80px; width: 150px; height: 150px; border-radius: 50%; }
+    .choice-num { display: block; line-height: 1.05; }
     .eg-block.count-on { outline: 6px solid #ffc93c; outline-offset: 2px; }
-    .tap-hint { color: var(--ink-soft); font-size: 24px; }
+    .tap-hint { color: var(--ink-soft); font-size: clamp(18px, calc(var(--u) * 3.4), 26px); text-align: center; }
   </style>
 </head>
 <body>
   <main class="eg-main">
     <!-- モード選択 -->
-    <section id="menu" class="eg-main" style="padding:0">
-      <div class="range" id="range">
-        <button class="eg-btn on" data-max="10">1〜10</button>
-        <button class="eg-btn" data-max="20">1〜20</button>
-      </div>
-      <div class="menu">
-        <button class="eg-btn" data-mode="howmany"><span class="e">🧱</span>いくつ？<small>How many?</small></button>
-        <button class="eg-btn" data-mode="listen"><span class="e">👂</span>えいごで きこう<small>Listen!</small></button>
-        <button class="eg-btn" data-mode="tap"><span class="e">👆</span>タップで かぞえる<small>Tap & count</small></button>
+    <section id="menu">
+      <div id="menu-fit">
+        <div class="range" id="range">
+          <button class="eg-btn on" data-max="10">1〜10</button>
+          <button class="eg-btn" data-max="20">1〜20</button>
+        </div>
+        <div class="menu">
+          <button class="eg-btn" data-mode="howmany"><span class="e">🧱</span>いくつ？<small>How many?</small></button>
+          <button class="eg-btn" data-mode="listen"><span class="e">👂</span>えいごで きこう<small>Listen!</small></button>
+          <button class="eg-btn" data-mode="tap"><span class="e">👆</span>タップで かぞえる<small>Tap & count</small></button>
+        </div>
       </div>
     </section>
 
     <!-- プレイ画面 -->
-    <section id="play" class="eg-main eg-hidden" style="padding:0; width:100%">
-      <div id="progress"></div>
-      <div class="stage" id="stage"></div>
-      <div class="eg-word" id="word"></div>
-      <div id="choices"></div>
+    <section id="play" class="eg-hidden">
+      <div class="eg-play">
+        <div id="progress"></div>
+        <div id="stage"></div>
+        <div class="eg-word" id="word"></div>
+        <div id="choices"></div>
+      </div>
     </section>
   </main>
 

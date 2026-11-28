@@ -5,9 +5,13 @@
   const ROUND = 5; // 1回のあそびで何問か
 
   const $ = (id) => document.getElementById(id);
-  const menu = $("menu"), play = $("play"), stage = $("stage"), word = $("word"), choicesEl = $("choices"), progressEl = $("progress");
+  const menu = $("menu"), play = $("play"), word = $("word"), choicesEl = $("choices"), progressEl = $("progress");
 
   let max = 10, mode = null, qIndex = 0, last = 0;
+  // 画面に合わせて拡大・縮小（スクロールしない）
+  EG.fit($("menu-fit"), { fill: true });
+  const stage = EG.fit($("stage"), { max: 3 });
+  const BLOCK = 48; // ブロックの基本の大きさ（EG.fit で画面に合わせて拡大される）
 
   EG.mountHeader({
     title: "かぞえよう",
@@ -82,7 +86,7 @@
 
   // ---- モード1：いくつ？ ----
   function howmany(n) {
-    const blocks = EG.renderBlocks(stage.appendChild(clear()), [{ count: n, color: "a" }], { size: EG.blockSize(n) });
+    const blocks = EG.renderBlocks(stage.appendChild(clear()), [{ count: n, color: "a" }], { size: BLOCK });
     EG.say("How many?");
     const opts = EG.makeChoices(n, 3, 1, max);
     EG.renderChoices(choicesEl, opts, n, {
@@ -116,7 +120,7 @@
         box.innerHTML = "";
         const g = document.createElement("div");
         box.appendChild(g);
-        EG.renderBlocks(g, [{ count: n, color: "c" }], { size: EG.blockSize(n), numbers: true, stagger: 40 });
+        EG.renderBlocks(g, [{ count: n, color: "c" }], { size: BLOCK, numbers: true, stagger: 40 });
         word.textContent = `${n}  ${EG.numberWord(n)}!`;
         await EG.say(EG.numberWord(n) + "!");
         await EG.wait(500);
@@ -129,7 +133,7 @@
   // ---- モード3：タップで かぞえる（まちがいなし） ----
   function tap(n) {
     const box = clear();
-    const blocks = EG.renderBlocks(box, [{ count: n, color: "b" }], { size: EG.blockSize(n) });
+    const blocks = EG.renderBlocks(box, [{ count: n, color: "b" }], { size: BLOCK });
     stage.appendChild(box);
     choicesEl.innerHTML = `<div class="tap-hint">ブロックを タップしてね</div>`;
     let counted = 0;

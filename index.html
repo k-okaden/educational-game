@@ -17,52 +17,60 @@
 <body>
   <!-- ① はじめての画面：ゲスト／ログイン -->
   <section class="scr" id="scr-welcome" hidden>
-    <div class="hero">
-      <h1>あそびのひろば</h1>
-      <p>かず・えいご・けいさんで あそぼう</p>
-    </div>
-    <div class="big-choices">
-      <button class="choice" id="w-guest" style="--c:#4f8ff7">
-        <span class="e">👤</span><b>ゲストで あそぶ</b><small>この たんまつ だけに ほぞん</small>
-      </button>
-      <button class="choice" id="w-login" style="--c:#2ecc71">
-        <span class="e">☁️</span><b>ログイン</b><small>クラウドに ほぞん（おうちの ひと）</small>
-      </button>
+    <div class="fitbox" data-fit>
+      <div class="hero">
+        <h1>あそびのひろば</h1>
+        <p>かず・えいご・けいさんで あそぼう</p>
+      </div>
+      <div class="big-choices">
+        <button class="choice" id="w-guest" style="--c:#4f8ff7">
+          <span class="e">👤</span><b>ゲストで あそぶ</b><small>この たんまつ だけに ほぞん</small>
+        </button>
+        <button class="choice" id="w-login" style="--c:#2ecc71">
+          <span class="e">☁️</span><b>ログイン</b><small>クラウドに ほぞん（おうちの ひと）</small>
+        </button>
+      </div>
     </div>
   </section>
 
   <!-- ② ログイン：QR／Firebase 設定 -->
   <section class="scr" id="scr-login" hidden>
     <div class="topbar"><button class="eg-round-btn" data-back aria-label="もどる">⬅️</button><h2>ログイン</h2><span class="sp"></span></div>
-    <div class="col">
-      <button class="choice wide" id="l-scan" style="--c:#2ecc71">
-        <span class="e">📷</span><b>QRを よみとる</b><small>2だいめ からは これだけ</small>
-      </button>
-      <button class="link-btn" id="l-setup">はじめての たんまつ：Firebase を せっていして おうちを つくる</button>
-      <p class="note">クラウドに ほぞんするには、おうちの Firebase（むりょう）が ひつようです。<a href="docs/cloud-sync.md" target="_blank" rel="noopener">せっていの しかた</a></p>
+    <div class="fitbox" data-fit>
+      <div class="col">
+        <button class="choice wide" id="l-scan" style="--c:#2ecc71">
+          <span class="e">📷</span><b>QRを よみとる</b><small>2だいめ からは これだけ</small>
+        </button>
+        <button class="link-btn" id="l-setup">はじめての たんまつ：Firebase を せっていして おうちを つくる</button>
+        <p class="note">クラウドに ほぞんするには、おうちの Firebase（むりょう）が ひつようです。<a href="docs/cloud-sync.md" target="_blank" rel="noopener">せっていの しかた</a></p>
+      </div>
     </div>
   </section>
 
   <!-- ③ QR 読み取り（アプリ内カメラ） -->
   <section class="scr" id="scr-scan" hidden>
     <div class="topbar"><button class="eg-round-btn" data-back aria-label="もどる">⬅️</button><h2>QRを うつしてね</h2><span class="sp"></span></div>
-    <div class="col">
-      <div class="scan-box"><video id="scan-video" playsinline muted></video><div class="scan-frame"></div></div>
-      <p class="note" id="scan-msg">1だいめの「おとなメニュー → 2だいめを つなぐ」の QR を うつしてください</p>
+    <div class="fitbox" data-fit>
+      <div class="col">
+        <div class="scan-box"><video id="scan-video" playsinline muted></video><div class="scan-frame"></div></div>
+        <p class="note center" id="scan-msg">1だいめの「おとなメニュー → 2だいめを つなぐ」の QR を うつしてください</p>
+      </div>
     </div>
   </section>
 
   <!-- ④ Firebase 設定（1台目） -->
   <section class="scr" id="scr-setup" hidden>
     <div class="topbar"><button class="eg-round-btn" data-back aria-label="もどる">⬅️</button><h2>Firebase の せってい</h2><span class="sp"></span></div>
-    <form class="col form" id="setup-form" autocomplete="off">
-      <label>firebaseConfig（コンソールの「マイアプリ」から まるごとコピー）
-        <textarea id="f-config" rows="6" spellcheck="false" placeholder='const firebaseConfig = {&#10;  apiKey: "...",&#10;  projectId: "...",&#10;  ...&#10;};'></textarea>
-      </label>
-      <p class="err" id="f-err"></p>
-      <button class="eg-btn primary" type="submit" id="f-submit">おうちを つくる</button>
-      <p class="note">入力した内容は この たんまつ にだけ ほぞんされます。<a href="docs/cloud-sync.md" target="_blank" rel="noopener">せっていの しかた</a></p>
-    </form>
+    <div class="fitbox" data-fit>
+      <form class="col form" id="setup-form" autocomplete="off">
+        <label>firebaseConfig（コンソールの「マイアプリ」から まるごとコピー）
+          <textarea id="f-config" rows="6" spellcheck="false" placeholder='const firebaseConfig = {&#10;  apiKey: "...",&#10;  projectId: "...",&#10;  ...&#10;};'></textarea>
+        </label>
+        <p class="err" id="f-err"></p>
+        <button class="eg-btn primary" type="submit" id="f-submit">おうちを つくる</button>
+        <p class="note">入力した内容は この たんまつ にだけ ほぞんされます。<a href="docs/cloud-sync.md" target="_blank" rel="noopener">せっていの しかた</a></p>
+      </form>
+    </div>
   </section>
 
   <!-- ⑤ だれが あそぶ？ -->
@@ -74,16 +82,22 @@
   <!-- ⑥ こどもを ふやす -->
   <section class="scr" id="scr-newkid" hidden>
     <div class="topbar"><button class="eg-round-btn" data-back aria-label="もどる">⬅️</button><h2>なまえを おしえてね</h2><button class="eg-round-btn" id="newkid-gear" aria-label="おとなメニュー">⚙️</button></div>
-    <form class="col form" id="kid-form" autocomplete="off">
-      <div class="kid-preview" id="kid-preview"><span></span></div>
-      <input id="kid-name" class="kid-name" maxlength="8" placeholder="なまえ（ひらがな）" />
-      <p class="lbl">マーク</p>
-      <div class="pick icons" id="kid-icons"></div>
-      <p class="lbl">いろ</p>
-      <div class="pick colors" id="kid-colors"></div>
-      <p class="err" id="kid-err"></p>
-      <button class="eg-btn primary" type="submit">できた！</button>
-    </form>
+    <div class="fitbox" data-fit>
+      <form class="kid-form form" id="kid-form" autocomplete="off">
+        <div class="kf-left">
+          <div class="kid-preview" id="kid-preview"><span></span></div>
+          <input id="kid-name" class="kid-name" maxlength="8" placeholder="なまえ（ひらがな）" />
+          <p class="err" id="kid-err"></p>
+          <button class="eg-btn primary" type="submit">できた！</button>
+        </div>
+        <div class="kf-right">
+          <p class="lbl">マーク</p>
+          <div class="pick icons" id="kid-icons"></div>
+          <p class="lbl">いろ</p>
+          <div class="pick colors" id="kid-colors"></div>
+        </div>
+      </form>
+    </div>
   </section>
 
   <!-- ⑦ ゲーム一覧 -->
@@ -91,72 +105,98 @@
     <div class="hub-top">
       <button class="kid-chip" id="kid-chip" aria-label="こどもを かえる"><span class="ic"></span><span class="nm"></span></button>
       <div class="eg-stars" id="total">⭐<b>0</b></div>
-      <span class="sp"></span>
+      <h1 class="hub-name">あそびのひろば</h1>
       <span class="sync-dot" id="sync-dot" title=""></span>
       <button class="eg-round-btn" id="games-gear" aria-label="おとなメニュー">⚙️</button>
     </div>
-    <div class="hub-title"><h1>あそびのひろば</h1><p>どれで あそぶ？</p></div>
     <main class="grid" id="grid"></main>
   </section>
 
-  <!-- おとなメニュー（⚙️ 3秒長押し） -->
+  <!-- おとなメニュー（⚙️ 3秒長押し）：タブで分けて、1タブずつ1画面に収める -->
   <dialog id="adult">
     <div class="dlg-head"><h2>おとなメニュー</h2><button class="eg-round-btn small" id="a-close" aria-label="とじる">✖️</button></div>
-
-    <h3>🔊 おと・こえ</h3>
-    <label class="row">こうかおん <input type="checkbox" id="s-sound" /></label>
-    <label class="row">よみあげ（えいご） <input type="checkbox" id="s-voice" /></label>
-    <label class="row">えいごの こえ <select id="s-voiceuri"></select></label>
-    <label class="row">よみあげの はやさ <span class="rate-wrap">🐢 <input type="range" id="s-rate" min="0.5" max="1.1" step="0.05" /> 🐇</span></label>
-    <button class="eg-btn sub wide" id="s-test">▶ ためしに きく</button>
-    <details class="note-box"><summary>こえが にほんごっぽい とき</summary>
-      <p>端末に英語（English US）の声を追加してください。<br>
-      iPad：設定 → アクセシビリティ → 読み上げコンテンツ → 声 → English → Samantha など（「拡張」「プレミアム」がおすすめ）<br>
-      Android：設定 → システム → 言語 → 音声出力 → Google 音声サービス → 英語（米国）をインストール</p>
-    </details>
-
-    <h3>👧 こども</h3>
-    <div id="a-kids" class="a-kids"></div>
-    <div class="row2">
-      <button class="eg-btn sub" id="a-addkid">＋ こどもを ふやす</button>
-      <button class="eg-btn sub" id="a-reset-all">ほしを ぜんいん 0に</button>
+    <div class="tabs" id="a-tabs">
+      <button data-tab="sound" class="on">🔊 おと</button>
+      <button data-tab="kids">👧 こども</button>
+      <button data-tab="cloud">☁️ クラウド</button>
+      <button data-tab="debug">🛠 デバッグ</button>
     </div>
 
-    <h3>☁️ クラウド</h3>
-    <div id="a-guest">
-      <p class="note">いまは ゲスト（この たんまつ だけに ほぞん）です。</p>
-      <button class="eg-btn sub wide" id="a-login">ログインする</button>
-    </div>
-    <div id="a-cloud" hidden>
-      <p class="note" id="a-cloud-info"></p>
-      <p class="err" id="a-cloud-err"></p>
-      <div class="row2">
-        <button class="eg-btn sub" id="a-sync">🔄 いま どうき</button>
-        <button class="eg-btn sub" id="a-showqr">📱 2だいめを つなぐ</button>
+    <div class="pane" data-pane="sound" data-fit>
+      <div>
+        <label class="row">こうかおん <input type="checkbox" id="s-sound" /></label>
+        <label class="row">よみあげ（えいご） <input type="checkbox" id="s-voice" /></label>
+        <label class="row">えいごの こえ <select id="s-voiceuri"></select></label>
+        <label class="row">よみあげの はやさ <span class="rate-wrap">🐢 <input type="range" id="s-rate" min="0.5" max="1.1" step="0.05" /> 🐇</span></label>
+        <button class="eg-btn sub wide" id="s-test">▶ ためしに きく</button>
+        <details class="note-box"><summary>こえが にほんごっぽい とき</summary>
+          <p>端末に英語（English US）の声を追加してください。<br>
+          iPad：設定 → アクセシビリティ → 読み上げコンテンツ → 声 → English → Samantha など（「拡張」「プレミアム」がおすすめ）<br>
+          Android：設定 → システム → 言語 → 音声出力 → Google 音声サービス → 英語（米国）をインストール</p>
+        </details>
       </div>
-      <div id="a-qr-box" class="qr-box" hidden>
-        <p class="note" id="a-qr-first" hidden>🎉 おうちが できました！ この QR を ほぞん（いんさつ・スクリーンショット）しておいてください。</p>
-        <img id="a-qr" class="qr" alt="2だいめを つなぐ QR" />
-        <p class="note center">2だいめ：アプリを ひらく →「ログイン」→「QRを よみとる」</p>
-        <p class="warn">⚠️ この QR は「いえの かぎ」と おなじです。よみとると だれでも おうちに はいれます。ほかの人に 見せないでください。<br>
-          すべての たんまつを なくしたときも、この QR が あれば もとに もどせます。ほぞん しておいてください。</p>
-        <button class="eg-btn sub wide" id="a-saveqr">🖼 QRを がぞうで ほぞん</button>
-        <button class="eg-btn sub wide" id="a-regen">🔁 QRを つくりなおす（ふるい QR では はいれなく する）</button>
-      </div>
-      <p class="lbl2">つながっている たんまつ</p>
-      <div id="a-devices" class="a-kids"></div>
     </div>
 
-    <h3>🛠 デバッグ</h3>
-    <table class="dbg" id="a-dbg"></table>
-    <details class="note-box"><summary>ほぞんデータの なかみ（JSON）</summary>
-      <pre id="a-json"></pre>
-      <button class="eg-btn sub wide" id="a-copy">コピー</button>
-    </details>
-    <div class="danger-zone">
-      <button class="eg-btn danger wide" id="d-local">この たんまつの データを ぜんぶ けす</button>
-      <button class="eg-btn danger wide cloud-only" id="d-cloud">クラウドの データを ぜんぶ けす</button>
-      <button class="eg-btn danger wide cloud-only" id="d-all">ぜんぶ リセット（たんまつ ＋ クラウド）</button>
+    <div class="pane" data-pane="kids" data-fit hidden>
+      <div>
+        <div id="a-kids" class="a-kids"></div>
+        <div class="row2">
+          <button class="eg-btn sub" id="a-addkid">＋ こどもを ふやす</button>
+          <button class="eg-btn sub" id="a-reset-all">ほしを ぜんいん 0に</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" data-pane="cloud" data-fit hidden>
+      <div>
+        <div id="a-guest">
+          <p class="note">いまは ゲスト（この たんまつ だけに ほぞん）です。</p>
+          <button class="eg-btn sub wide" id="a-login">ログインする</button>
+        </div>
+        <div id="a-cloud" hidden>
+          <div id="a-cloud-main">
+            <p class="note" id="a-cloud-info"></p>
+            <p class="err" id="a-cloud-err"></p>
+            <div class="row2">
+              <button class="eg-btn sub" id="a-sync">🔄 いま どうき</button>
+              <button class="eg-btn sub" id="a-showqr">📱 2だいめを つなぐ</button>
+            </div>
+            <p class="lbl2">つながっている たんまつ</p>
+            <div id="a-devices" class="a-kids"></div>
+          </div>
+          <div id="a-qr-box" class="qr-box" hidden>
+            <p class="note" id="a-qr-first" hidden>🎉 おうちが できました！ この QR を ほぞん（いんさつ・スクリーンショット）しておいてください。</p>
+            <div class="qr-row">
+              <img id="a-qr" class="qr" alt="2だいめを つなぐ QR" />
+              <div class="qr-side">
+                <p class="note">2だいめ：アプリを ひらく →「ログイン」→「QRを よみとる」</p>
+                <p class="warn">⚠️ この QR は「いえの かぎ」と おなじです。ほかの人に 見せないでください。<br>
+                  すべての たんまつを なくしても、この QR が あれば もとに もどせます。</p>
+              </div>
+            </div>
+            <button class="eg-btn sub wide" id="a-saveqr">🖼 QRを がぞうで ほぞん</button>
+            <div class="row2">
+              <button class="eg-btn sub" id="a-qr-back">⬅️ もどる</button>
+              <button class="eg-btn sub" id="a-regen">🔁 QRを つくりなおす</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" data-pane="debug" data-fit hidden>
+      <div>
+        <table class="dbg" id="a-dbg"></table>
+        <details class="note-box"><summary>ほぞんデータの なかみ（JSON）</summary>
+          <pre id="a-json"></pre>
+          <button class="eg-btn sub wide" id="a-copy">コピー</button>
+        </details>
+        <div class="danger-zone">
+          <button class="eg-btn danger wide" id="d-local">この たんまつの データを ぜんぶ けす</button>
+          <button class="eg-btn danger wide cloud-only" id="d-cloud">クラウドの データを ぜんぶ けす</button>
+          <button class="eg-btn danger wide cloud-only" id="d-all">ぜんぶ リセット（たんまつ ＋ クラウド）</button>
+        </div>
+      </div>
     </div>
   </dialog>
 

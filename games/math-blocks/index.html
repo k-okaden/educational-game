@@ -6,39 +6,43 @@
   <title>けいさんブロック</title>
   <link rel="stylesheet" href="../../shared/core.css" />
   <style>
-    .levels { display: flex; flex-wrap: wrap; gap: 24px; justify-content: center; }
-    .levels .eg-btn { min-width: 220px; min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .levels .eg-btn .e { font-size: 56px; letter-spacing: -6px; }
-    .lead { font-size: clamp(24px, 3.4vw, 36px); margin: 0; }
+    .levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 2.5); width: min(900px, 100%); margin: 0 auto; }
+    .levels .eg-btn { min-height: calc(var(--u) * 24); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 8px; font-size: clamp(22px, calc(var(--u) * 4.4), 40px); }
+    .levels .eg-btn .e { font-size: calc(var(--u) * 7.5); letter-spacing: -6px; line-height: 1.2; }
+    .lead { font-size: clamp(22px, calc(var(--u) * 4), 36px); margin: 0 0 calc(var(--u) * 3); text-align: center; }
 
-    .eq { display: flex; align-items: center; gap: .3em; font-size: clamp(56px, 10vw, 110px); font-weight: 800; line-height: 1; }
+    .eq { display: flex; align-items: center; gap: .3em; font-size: clamp(40px, calc(var(--u) * 9), 110px); font-weight: 800; line-height: 1; }
     .eq .a { color: var(--block-a); }
     .eq .b { color: var(--block-b); }
     .eq .q { color: var(--accent); min-width: 1em; text-align: center; }
     .eq .q.done { color: var(--block-c); animation: eg-bump .5s; }
 
-    .stage { min-height: 32vh; display: flex; align-items: center; justify-content: center; gap: clamp(16px, 4vw, 48px); width: 100%; flex-wrap: wrap; }
-    .stage .op { font-size: clamp(48px, 8vw, 80px); font-weight: 800; color: var(--ink-soft); }
-    .mul-grid { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
-    .mul-row { display: flex; align-items: center; gap: 12px; }
+    .stage-row { display: flex; align-items: center; justify-content: center; gap: 40px; }
+    .stage-row .op { font-size: 64px; font-weight: 800; color: var(--ink-soft); }
+    .mul-grid { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+    .mul-row { display: flex; align-items: center; gap: 10px; }
     .mul-row .tag { font-size: 24px; font-weight: 700; color: var(--ink-soft); min-width: 2.4em; text-align: right; opacity: 0; transition: opacity .3s; }
     .mul-row .tag.on { opacity: 1; color: var(--accent); }
-    .hint-btn { font-size: 32px; min-height: 80px; }
+    .hint-btn { font-size: clamp(24px, calc(var(--u) * 4.4), 36px); min-height: 88px; }
   </style>
 </head>
 <body>
   <main class="eg-main">
-    <section id="menu" class="eg-main" style="padding:0">
-      <p class="lead" id="lead"></p>
-      <div class="levels" id="levels"></div>
+    <section id="menu">
+      <div id="menu-fit">
+        <p class="lead" id="lead"></p>
+        <div class="levels" id="levels"></div>
+      </div>
     </section>
 
-    <section id="play" class="eg-main eg-hidden" style="padding:0; width:100%">
-      <div id="progress"></div>
-      <div class="eq" id="eq"></div>
-      <div class="stage" id="stage"></div>
-      <div class="eg-word" id="word"></div>
-      <div id="choices"></div>
+    <section id="play" class="eg-hidden">
+      <div class="eg-play">
+        <div id="progress"></div>
+        <div class="eq" id="eq"></div>
+        <div id="stage"></div>
+        <div class="eg-word" id="word"></div>
+        <div id="choices"></div>
+      </div>
     </section>
   </main>
 

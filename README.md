@@ -76,6 +76,8 @@ sw.js                 オフライン対応
 | `EG.numberWord(n)` / `EG.sayNumber(n)` | 7 → "seven" |
 | `EG.sfx.tap/correct/wrong/fanfare/pop(i)` | 効果音（音声ファイル不要） |
 | `EG.renderBlocks(el, [{count, color}], opt)` | ブロックを5こずつ並べる |
+| `EG.fit(el, { max, fill })` | 中身を画面に合わせて拡大・縮小（スクロールしない）。戻り値の内側の要素に中身を入れる |
+| `EG.gridFit(el, () => 数, opt)` | カードをスクロールせずに いちばん大きく並べる |
 | `EG.renderChoices(el, choices, answer, {onCorrect})` | 大きな選択肢ボタン |
 | `EG.makeChoices(answer, n, min, max)` | 正解の近くの数で選択肢を作る |
 | `EG.stars.add(gameId)` | いま遊んでいるこどもに ⭐ を追加 |
