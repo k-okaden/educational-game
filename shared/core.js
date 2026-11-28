@@ -6,7 +6,8 @@
  *   EG.say("seven")           -> 英語で読み上げ
  *   EG.say("すごい！", "ja")  -> 日本語で読み上げ
  *   EG.sfx.correct()          -> 効果音
- *   EG.stars.add("counting")  -> ほしを1つ追加
+ *   EG.stars.add("counting")  -> いま遊んでいるこどもに ほしを1つ追加
+ *   EG.save.get/set(gameId)   -> ゲームごとのセーブデータ（こどもごと・クラウド同期対応）
  *   EG.renderBlocks(el, [{count:3, color:"a"}, {count:2, color:"b"}])
  *   EG.mountHeader({ title, gameId })
  *   EG.showReward({ onAgain, onHome })
@@ -189,38 +190,141 @@
     if (hasSpeech) { try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); } catch { /* noop */ } }
   }, { once: true });
 
-  // ---------- ほし（ごほうびポイント） ----------
-  // eg.stars        : この端末でためた数 { gameId: n }
-  // eg.stars.others : クラウド同期した「ほかの端末」の数 { deviceId: { gameId: n } }（cloud.js が書く）
-  // 表示する数 = この端末 + ほかの端末 の合計。端末ごとに別々に記録するので、同時に遊んでもぶつからない。
-  const STARS_KEY = "eg.stars";
-  const OTHERS_KEY = "eg.stars.others";
+  // ---------- データ（モード・こども・ほし・セーブ） ----------
+  // ゲーム側は EG.stars / EG.save だけ使えばよい。ゲスト（端末内）かクラウドかは気にしなくてよい。
+  //
+  // localStorage
+  //   eg.mode     : "guest" | "cloud"（未設定なら最初の画面）
+  //   eg.profiles : { pid: { name, icon, color, createdAt, updatedAt } }  こども一覧
+  //   eg.deleted  : { pid: 消した時刻 }  消したこども（クラウドでほかの端末に伝える）
+  //   eg.local    : { profiles: { pid: { stars: { gameId: n }, games: { gameId: { d: データ, t: 時刻 } } } } }
+  //                 この端末で遊んだぶん
+  //   eg.remote   : { pid: { stars: {...}, games: {...} } }  ほかの端末のぶん（cloud.js が合計して書く）
+  // sessionStorage
+  //   eg.current  : いま遊んでいるこども（アプリを開くたびに「だれが あそぶ？」で選ぶ）
+  const K = { mode: "eg.mode", profiles: "eg.profiles", deleted: "eg.deleted", local: "eg.local", remote: "eg.remote", current: "eg.current", hiddenAt: "eg.hiddenAt" };
+  EG.KEYS = K;
+  EG.SCHEMA_VERSION = 1;
+  const getJ = (k) => safeJSON(localStorage.getItem(k));
+  const putJ = (k, v) => safeSet(k, JSON.stringify(v));
+  const ss = {
+    get: (k) => { try { return sessionStorage.getItem(k); } catch { return null; } },
+    set: (k, v) => { try { sessionStorage.setItem(k, v); } catch { /* noop */ } },
+    del: (k) => { try { sessionStorage.removeItem(k); } catch { /* noop */ } },
+  };
+  EG.storage = { getJ, putJ, safeJSON };
+  /** 画面の更新用（hub が聞く） */
+  const changed = (what) => window.dispatchEvent(new CustomEvent("eg:data", { detail: { what } }));
+  /** 端末のデータが変わった（cloud.js が聞いて送る） */
+  const dirty = () => window.dispatchEvent(new Event("eg:dirty"));
+  EG.randomId = (n = 12, chars = "abcdefghijkmnpqrstuvwxyz23456789") => {
+    const buf = new Uint32Array(n);
+    crypto.getRandomValues(buf);
+    return Array.from(buf, (x) => chars[x % chars.length]).join("");
+  };
+
+  EG.mode = {
+    get: () => { try { return localStorage.getItem(K.mode) || ""; } catch { return ""; } },
+    set(m) {
+      safeSet(K.mode, m);
+      // ブラウザに「消さないで」とお願いする（対応ブラウザのみ）
+      try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch { /* noop */ }
+      changed("mode");
+    },
+  };
+
+  EG.profiles = {
+    all() { return getJ(K.profiles); },
+    list() {
+      return Object.entries(this.all()).map(([id, p]) => Object.assign({ id }, p))
+        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    },
+    get(id) { const p = this.all()[id]; return p ? Object.assign({ id }, p) : null; },
+    current() { return this.get(ss.get(K.current)); },
+    select(id) { ss.set(K.current, id); changed("current"); },
+    unselect() { ss.del(K.current); changed("current"); },
+    create({ name, icon, color }) {
+      const all = this.all();
+      const id = "p" + EG.randomId(10);
+      const now = Date.now();
+      all[id] = { name: String(name).slice(0, 10), icon, color, createdAt: now, updatedAt: now };
+      putJ(K.profiles, all);
+      migrateLegacyStars(id);
+      changed("profiles"); dirty();
+      return id;
+    },
+    update(id, patch) {
+      const all = this.all();
+      if (!all[id]) return;
+      Object.assign(all[id], patch, { updatedAt: Date.now() });
+      putJ(K.profiles, all);
+      changed("profiles"); dirty();
+    },
+    /** こどもを消す（ほし・進み具合も）。クラウドではほかの端末にも伝わる */
+    remove(id) {
+      const all = this.all(); delete all[id]; putJ(K.profiles, all);
+      const del = getJ(K.deleted); del[id] = Date.now(); putJ(K.deleted, del);
+      const L = getJ(K.local); if (L.profiles) delete L.profiles[id]; putJ(K.local, L);
+      const R = getJ(K.remote); delete R[id]; putJ(K.remote, R);
+      if (ss.get(K.current) === id) ss.del(K.current);
+      changed("profiles"); dirty();
+    },
+  };
+
+  // 旧バージョン（こども機能より前）の ほし を、最初に作ったこどもに引きつぐ
+  function migrateLegacyStars(pid) {
+    const old = localStorage.getItem("eg.stars");
+    if (old === null) return;
+    const L = getJ(K.local);
+    L.profiles = L.profiles || {};
+    L.profiles[pid] = L.profiles[pid] || { stars: {}, games: {} };
+    for (const [g, n] of Object.entries(safeJSON(old))) L.profiles[pid].stars[g] = (L.profiles[pid].stars[g] || 0) + (+n || 0);
+    putJ(K.local, L);
+    ["eg.stars", "eg.stars.others", "eg.cloud"].forEach((k) => { try { localStorage.removeItem(k); } catch { /* noop */ } });
+  }
+
+  const curId = () => { const p = EG.profiles.current(); return p ? p.id : null; };
+  function localOf(pid, L = getJ(K.local)) {
+    L.profiles = L.profiles || {};
+    const P = (L.profiles[pid] = L.profiles[pid] || {});
+    P.stars = P.stars || {};
+    P.games = P.games || {};
+    return { L, P };
+  }
+
   EG.stars = {
-    own() { return safeJSON(localStorage.getItem(STARS_KEY)); },
-    others() { return safeJSON(localStorage.getItem(OTHERS_KEY)); },
-    setOthers(o) { safeSet(OTHERS_KEY, JSON.stringify(o || {})); this.refresh(false); },
-    all() {
-      const sum = Object.assign({}, this.own());
-      for (const dev of Object.values(this.others())) {
-        for (const [g, n] of Object.entries(dev || {})) sum[g] = (sum[g] || 0) + (+n || 0);
-      }
+    /** こどもの ゲームごとの ほし（この端末＋ほかの端末の合計） */
+    all(pid = curId()) {
+      if (!pid) return {};
+      const sum = Object.assign({}, (getJ(K.local).profiles || {})[pid]?.stars);
+      for (const [g, n] of Object.entries(getJ(K.remote)[pid]?.stars || {})) sum[g] = (sum[g] || 0) + (+n || 0);
       return sum;
     },
-    get(gameId) { const a = this.all(); return gameId ? a[gameId] || 0 : Object.values(a).reduce((x, y) => x + y, 0); },
+    get(gameId, pid = curId()) {
+      const a = this.all(pid);
+      return gameId ? a[gameId] || 0 : Object.values(a).reduce((x, y) => x + y, 0);
+    },
     add(gameId, n = 1) {
-      const own = this.own();
-      own[gameId] = (own[gameId] || 0) + n;
-      safeSet(STARS_KEY, JSON.stringify(own));
+      const pid = curId();
+      if (!pid) return 0;
+      const { L, P } = localOf(pid);
+      P.stars[gameId] = (P.stars[gameId] || 0) + n;
+      putJ(K.local, L);
       this.refresh(true);
-      window.dispatchEvent(new Event("eg:stars-added")); // クラウド同期がこれを聞いて送る
+      dirty();
       return this.get(gameId);
     },
-    /** すべて 0 にする（同期中ならほかの端末のぶんも cloud.js が消す） */
-    reset() {
-      safeSet(STARS_KEY, "{}");
-      safeSet(OTHERS_KEY, "{}");
+    /** ほしを 0 にする。pid を省略すると全員。クラウドではほかの端末にも伝わる */
+    reset(pid) {
+      const ids = pid ? [pid] : Object.keys(EG.profiles.all());
+      const L = getJ(K.local), R = getJ(K.remote);
+      for (const id of ids) {
+        if (L.profiles && L.profiles[id]) L.profiles[id].stars = {};
+        if (R[id]) R[id].stars = {};
+      }
+      putJ(K.local, L); putJ(K.remote, R);
       this.refresh(false);
-      window.dispatchEvent(new Event("eg:stars-reset"));
+      window.dispatchEvent(new CustomEvent("eg:reset", { detail: { pids: ids } }));
     },
     /** 画面のほしの数を更新 */
     refresh(bump) {
@@ -228,8 +332,88 @@
         b.textContent = this.get();
         if (bump) { const el = b.parentElement; el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
       });
-      window.dispatchEvent(new Event("eg:stars"));
+      changed("stars");
     },
+  };
+
+  /**
+   * ゲームごとの自由なセーブデータ（レベル・ベスト記録など。小さな JSON にする）
+   *   EG.save.set("clock", { level: 3 });  EG.save.get("clock") -> { level: 3 } | null
+   * 端末ごとに違うときは、あたらしく保存した方を使う
+   */
+  EG.save = {
+    get(gameId, pid = curId()) {
+      if (!pid) return null;
+      const a = (getJ(K.local).profiles || {})[pid]?.games?.[gameId];
+      const b = getJ(K.remote)[pid]?.games?.[gameId];
+      const best = !a ? b : !b ? a : (b.t > a.t ? b : a);
+      return best ? best.d : null;
+    },
+    set(gameId, data) {
+      const pid = curId();
+      if (!pid) return;
+      const { L, P } = localOf(pid);
+      P.games[gameId] = { d: data, t: Date.now() };
+      putJ(K.local, L);
+      dirty();
+    },
+  };
+
+  /** この端末のデータをぜんぶ消す（設定・ログイン・こども・キャッシュ） */
+  EG.wipeLocal = async () => {
+    try {
+      Object.keys(localStorage).filter((k) => k.startsWith("eg.")).forEach((k) => localStorage.removeItem(k));
+    } catch { /* noop */ }
+    try { sessionStorage.clear(); } catch { /* noop */ }
+    try { if (window.caches) for (const k of await caches.keys()) await caches.delete(k); } catch { /* noop */ }
+  };
+
+  // しばらく（30分）アプリを離れていたら、次は「だれが あそぶ？」から
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") ss.set(K.hiddenAt, String(Date.now()));
+    else {
+      const t = +ss.get(K.hiddenAt) || 0;
+      if (t && Date.now() - t > 30 * 60 * 1000 && EG.profiles.current()) {
+        EG.profiles.unselect();
+        if (!EG.isHub) location.href = EG.ROOT + "index.html";
+      }
+    }
+  });
+
+  // ---------- おとなロック（長押しで開く） ----------
+  /**
+   * @param {HTMLElement} el   長押しするボタン
+   * @param {Function} onUnlock
+   * @param {number} ms
+   */
+  EG.adultLock = (el, onUnlock, ms = 3000) => {
+    let timer = null, start = 0, raf = 0;
+    el.classList.add("eg-lock");
+    const stop = () => { clearTimeout(timer); cancelAnimationFrame(raf); timer = null; el.style.setProperty("--p", 0); el.classList.remove("holding"); };
+    const tick = () => { el.style.setProperty("--p", Math.min(1, (Date.now() - start) / ms)); raf = requestAnimationFrame(tick); };
+    el.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      start = Date.now();
+      el.classList.add("holding");
+      tick();
+      timer = setTimeout(() => { stop(); EG.sfx.correct(); onUnlock(); }, ms);
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach((ev) => el.addEventListener(ev, () => {
+      if (!timer) return;
+      const short = Date.now() - start < 600;
+      stop();
+      if (short) EG.toast("おとなの ひとは 3びょう ながおし してね");
+    }));
+    el.addEventListener("contextmenu", (e) => e.preventDefault());
+  };
+
+  EG.toast = (msg, ms = 2200) => {
+    let t = document.getElementById("eg-toast");
+    if (!t) { t = document.createElement("div"); t.id = "eg-toast"; document.body.appendChild(t); }
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(t._h);
+    t._h = setTimeout(() => t.classList.remove("show"), ms);
   };
 
   // ---------- ヘッダー ----------
@@ -238,13 +422,21 @@
    * @param {{title:string, homeHref?:string, onBack?:Function}} opt
    */
   EG.mountHeader = ({ title, homeHref = "../../index.html", onBack } = {}) => {
+    // 「だれが あそぶ？」を通っていなければトップへ
+    const kid = EG.profiles.current();
+    if (!EG.mode.get() || !kid) { location.replace(homeHref); return null; }
     const h = document.createElement("header");
     h.className = "eg-header";
     h.innerHTML = `
       <button class="eg-round-btn" aria-label="もどる">🏠</button>
       <h1></h1>
+      <div class="eg-kid" title=""><span class="ic"></span></div>
       <div class="eg-stars" aria-label="ほし">⭐<b>${EG.stars.get()}</b></div>`;
     h.querySelector("h1").textContent = title;
+    const chip = h.querySelector(".eg-kid");
+    chip.style.setProperty("--kc", kid.color);
+    chip.querySelector(".ic").textContent = kid.icon;
+    chip.title = kid.name;
     h.querySelector("button").addEventListener("click", () => {
       EG.sfx.tap();
       if (onBack && onBack() === false) return;
@@ -396,9 +588,8 @@
     window.addEventListener("load", () => navigator.serviceWorker.register(EG.ROOT + "sw.js").catch(() => {}));
   }
 
-  // ---------- クラウド同期（設定されているときだけ読み込む） ----------
-  // shared/cloud-config.js に Firebase の設定があれば shared/cloud.js を読み込む。
-  // ゲーム側は何もしなくてよい（ほしは EG.stars 経由で自動的に同期される）。
+  // ---------- クラウド同期（ログインしているときだけ読み込む） ----------
+  // ゲーム側は何もしなくてよい（EG.stars / EG.save の変更を cloud.js が自動で送る）。
   function loadScript(src) {
     return new Promise((res, rej) => {
       const el = document.createElement("script");
@@ -406,8 +597,8 @@
       document.head.appendChild(el);
     });
   }
-  EG.cloudReady = loadScript(EG.ROOT + "shared/cloud-config.js")
-    .then(() => (window.EG_CLOUD_CONFIG && window.EG_CLOUD_CONFIG.apiKey ? loadScript(EG.ROOT + "shared/cloud.js") : null))
-    .then(() => EG.cloud || null)
-    .catch(() => null);
+  EG.loadScript = loadScript;
+  let cloudP = null;
+  EG.loadCloud = () => cloudP || (cloudP = loadScript(EG.ROOT + "shared/cloud.js").then(() => EG.cloud).catch(() => { cloudP = null; return null; }));
+  EG.cloudReady = EG.mode.get() === "cloud" ? EG.loadCloud() : Promise.resolve(null);
 })();

@@ -1,25 +1,17 @@
 rules_version = '2';
 // あそびのひろば：クラウド同期用の Firestore セキュリティルール
 // Firebase コンソール → Firestore Database → ルール に、この内容をそのまま貼って「公開」する。
+//
+// ・ログインした本人の users/{uid} 以下だけ読み書きできる
+// ・ゲームごとの項目はここに書かない → ゲームが増えても このルールは変えなくてよい
+// ・アカウントは Firebase コンソールで作ったものだけ（新規登録はオフにする：docs/cloud-sync.md）
 service cloud.firestore {
   match /databases/{database}/documents {
-    // families/{かぞくコード}：コードを知っている端末だけが読み書きできる
-    match /families/{code} {
-      function validCode() {
-        return code.matches('^[2-9A-HJKMNP-Z]{20}$');
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+      match /{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
       }
-      function validData() {
-        return request.resource.data.keys().hasOnly(['devices', 'resetAt'])
-          && request.resource.data.devices is map
-          && request.resource.data.devices.size() <= 20
-          && (!('resetAt' in request.resource.data) || request.resource.data.resetAt is int);
-      }
-      allow get: if request.auth != null && validCode();
-      allow create, update: if request.auth != null && validCode() && validData();
-      allow list, delete: if false; // 一覧の取得（コードの総当たり）や削除はさせない
-    }
-    match /{document=**} {
-      allow read, write: if false;
     }
   }
 }

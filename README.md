@@ -16,7 +16,10 @@
 - 数字・式はすべて **英語で読み上げ**（"three plus two equals five!"）
 - まちがえてもペナルティなし。正解でほし⭐がたまる
 - 一度ひらけば **オフラインでも遊べる**（ホーム画面に追加するとアプリっぽく全画面で起動）
-- **クラウド同期**（任意）：同じ「かぞくコード」の端末どうしで ⭐ を共有。設定は [docs/cloud-sync.md](docs/cloud-sync.md)
+- 最初に **ゲスト**（端末の中だけに保存）か **ログイン**（クラウド保存）を選ぶ
+- **こどもを何人でも**（双子OK）。アプリを開くたびに「だれが あそぶ？」で選び、⭐ と進み具合はこどもごとに保存
+- **クラウド保存**（任意）：各家庭が自分の Firebase（無料）を用意。2台目以降は QR を読むだけでつながる → [docs/cloud-sync.md](docs/cloud-sync.md)
+- ⚙️ を **3秒長押し** で おとなメニュー（音・こども・クラウド・デバッグ／削除）
 
 ## タブレットで遊ぶ（GitHub Pages）
 
@@ -41,14 +44,15 @@ python3 -m http.server 8000
 ## 構成
 
 ```
-index.html            ハブ（トップ画面）。registry.js を読んでカードを並べる
+index.html            ハブ（トップ画面）：ゲスト/ログイン → だれが あそぶ？ → ゲーム一覧、おとなメニュー
+hub/                  ハブ専用の JS / CSS
 games/registry.js     ゲーム一覧 ← 新しいゲームはここに登録
 games/<id>/           ゲームごとのフォルダ
 games/_template/      新しいゲームのひな形
 shared/core.css       共通の見た目（ボタン、ブロック、ごほうび画面）
 shared/core.js        共通の機能（読み上げ、効果音、ほし、ブロック描画、紙ふぶき）
-shared/cloud.js       クラウド同期（cloud-config.js に設定があるときだけ読み込む）
-shared/vendor/        同梱ライブラリ（QRコード生成：qrcode-generator, MIT）
+shared/cloud.js       クラウド同期（ログインしているときだけ読み込む。Firebase の REST API を直接使用）
+shared/vendor/        同梱ライブラリ（QR表示：qrcode-generator / QR読み取り：jsQR）
 firestore.rules       クラウド同期用の Firestore セキュリティルール
 sw.js                 オフライン対応
 ```
@@ -74,7 +78,8 @@ sw.js                 オフライン対応
 | `EG.renderBlocks(el, [{count, color}], opt)` | ブロックを5こずつ並べる |
 | `EG.renderChoices(el, choices, answer, {onCorrect})` | 大きな選択肢ボタン |
 | `EG.makeChoices(answer, n, min, max)` | 正解の近くの数で選択肢を作る |
-| `EG.stars.add(gameId)` | ⭐を追加（端末に保存） |
+| `EG.stars.add(gameId)` | いま遊んでいるこどもに ⭐ を追加 |
+| `EG.save.get(gameId)` / `EG.save.set(gameId, data)` | ゲームごとのセーブデータ（こどもごと・クラウド同期も自動。Firebase 側の変更は不要） |
 | `EG.showReward({ onAgain })` | ごほうび画面＋紙ふぶき |
 
 ### 大きなゲームを別リポジトリで作りたいとき

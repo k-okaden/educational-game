@@ -88,6 +88,32 @@ button {
 }
 .eg-stars.bump { animation: eg-bump .5s; }
 
+.eg-kid {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: var(--kc, #ddd);
+  box-shadow: var(--shadow), inset 0 0 0 4px #fff;
+  display: grid; place-items: center; font-size: 36px; flex: none;
+}
+
+/* おとなロック：長押し中にリングがたまる */
+.eg-lock { position: relative; -webkit-user-select: none; user-select: none; touch-action: none; }
+.eg-lock::after {
+  content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  background: conic-gradient(var(--accent) calc(var(--p, 0) * 360deg), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%);
+  mask: radial-gradient(circle, transparent 62%, #000 63%);
+  opacity: 0; transition: opacity .15s; pointer-events: none;
+}
+.eg-lock.holding::after { opacity: 1; }
+
+#eg-toast {
+  position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); z-index: 80;
+  transform: translate(-50%, 140%); transition: transform .25s;
+  background: var(--ink); color: #fff; padding: 14px 24px; border-radius: 999px;
+  font-size: 20px; font-weight: 700; max-width: calc(100% - 32px); text-align: center;
+}
+#eg-toast.show { transform: translate(-50%, 0); }
+
 /* ===== 大きなボタン ===== */
 .eg-btn {
   min-height: 88px;
