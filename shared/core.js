@@ -137,7 +137,10 @@
   /** 正解を含む n 個の選択肢（正解の近くの数を優先） */
   EG.makeChoices = (answer, n = 3, min = 0, max = 100) => {
     const set = new Set([answer]);
-    const near = EG.shuffle([-2, -1, 1, 2, 3, -3, 10, -10]);
+    // 大きい数のときは「10ちがい」と「1ちがい」をまぜる（位の練習）
+    const near = max > 20
+      ? EG.shuffle([EG.shuffle([10, -10])[0], EG.shuffle([1, -1])[0]]).concat(EG.shuffle([-10, 10, 2, -2, 1, -1, 11, -11, 9, -9]))
+      : EG.shuffle([-2, -1, 1, 2, 3, -3, 10, -10]);
     for (const d of near) {
       if (set.size >= n) break;
       const v = answer + d;
@@ -658,6 +661,42 @@
     return blocks;
   };
 
+  /**
+   * 大きい数（21〜100）を「10のぼう」＋「ばら」で並べる
+   *   EG.renderTens(el, EG.tensOf(43, "a"))           -> ぼう4本＋ばら3こ
+   *   EG.renderTens(el, { rods: [...], ones: [...] })  -> 色を混ぜたいとき（ぼう1本 = 色10こ の配列）
+   * @returns {{rods: HTMLElement[], ones: HTMLElement[], wrap: HTMLElement}}
+   */
+  EG.tensOf = (n, color = "a") => ({
+    rods: Array.from({ length: Math.floor(n / 10) }, () => Array(10).fill(color)),
+    ones: Array(n % 10).fill(color),
+  });
+  EG.renderTens = (el, { rods = [], ones = [] }, { size = 30, stagger = 40 } = {}) => {
+    const wrap = document.createElement("div");
+    wrap.className = "eg-tens";
+    wrap.style.setProperty("--size", size + "px");
+    const mk = (color, i) => {
+      const b = document.createElement("div");
+      b.className = "eg-block";
+      b.style.setProperty("--c", COLORS[color] || color);
+      b.style.animationDelay = i * stagger + "ms";
+      return b;
+    };
+    const rodEls = rods.map((cols, r) => {
+      const rod = document.createElement("div");
+      rod.className = "eg-rod";
+      cols.forEach((c) => rod.appendChild(mk(c, r)));
+      wrap.appendChild(rod);
+      return rod;
+    });
+    const onesBox = document.createElement("div");
+    onesBox.className = "eg-ones";
+    const oneEls = ones.map((c, i) => { const b = mk(c, rods.length + i); onesBox.appendChild(b); return b; });
+    if (ones.length) wrap.appendChild(onesBox);
+    el.appendChild(wrap);
+    return { rods: rodEls, ones: oneEls, wrap };
+  };
+
   /** （旧）画面サイズとブロック数から ブロックの大きさを決める。いまは EG.fit を使う */
   EG.blockSize = (count, cols = 5, maxW = window.innerWidth * 0.8, maxH = window.innerHeight * 0.32) => {
     const c = Math.min(cols, Math.max(count, 1));
@@ -778,8 +817,21 @@
   };
 
   // ---------- オフライン対応 ----------
+  // 新しい版が届いたら、次に画面が切りかわるときに自動で読みこみ直す
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-    window.addEventListener("load", () => navigator.serviceWorker.register(EG.ROOT + "sw.js").catch(() => {}));
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register(EG.ROOT + "sw.js", { updateViaCache: "none" }).then((reg) => {
+        reg.update().catch(() => {});
+        document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+      }).catch(() => {});
+      let reloaded = false;
+      const hadController = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!hadController || reloaded || !EG.isHub) return; // ゲームの途中では読みこみ直さない
+        reloaded = true;
+        location.reload();
+      });
+    });
   }
 
   // ---------- クラウド同期（ログインしているときだけ読み込む） ----------

@@ -180,6 +180,15 @@ button {
   position: relative;
   animation: eg-pop .35s backwards;
 }
+/* 10のぼう＋ばら（21〜100 の数） */
+.eg-tens { display: flex; align-items: flex-end; gap: calc(var(--size, 30px) * .45); }
+.eg-rod {
+  display: flex; flex-direction: column-reverse; gap: 2px;
+  padding: 3px; border-radius: calc(var(--size, 30px) * .3); background: rgba(59,47,42,.08);
+}
+.eg-rod.tapped, .eg-rod.count-on { outline: 5px solid #ffc93c; outline-offset: 2px; }
+.eg-ones { display: grid; grid-template-columns: repeat(5, auto); gap: 4px; align-content: end; }
+
 .eg-block.gone {
   background: var(--block-gone);
   box-shadow: none;

@@ -6,6 +6,9 @@
 (function () {
   "use strict";
   EG.isHub = true;
+  // バージョン（右上に小さく）
+  $v();
+  function $v() { const el = document.getElementById("ver"); if (el) el.textContent = "v" + (self.EG_VERSION || "?"); }
   const $ = (id) => document.getElementById(id);
   const { getJ, putJ } = EG.storage;
   const K = EG.KEYS;

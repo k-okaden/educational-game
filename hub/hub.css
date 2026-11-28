@@ -168,3 +168,10 @@ dialog select { font: inherit; font-size: 17px; max-width: 60%; padding: 8px; bo
 #a-json { font-size: 12px; background: #f7f3ef; padding: 10px; border-radius: 12px; height: 140px; overflow: auto; white-space: pre-wrap; word-break: break-all; -webkit-user-select: text; user-select: text; margin: 0; }
 .danger-zone { margin-top: 12px; padding: 4px 12px 12px; border-radius: 18px; background: #fff5f5; }
 .eg-btn.danger { min-height: 56px; font-size: 17px; background: #ffe3e3; color: #c0392b; }
+
+/* バージョン表示（右上・⚙️ の下に小さく） */
+.ver {
+  position: fixed; right: 10px; z-index: 5; pointer-events: none;
+  top: calc(max(8px, env(safe-area-inset-top)) + var(--btn) + 4px);
+  font-size: 11px; color: var(--ink-soft); opacity: .75; letter-spacing: .02em;
+}

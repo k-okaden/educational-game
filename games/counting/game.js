@@ -1,8 +1,10 @@
-/* かぞえよう：ブロックを数える／英語を聞いて数字をえらぶ／タップで数える */
+/* かぞえよう：ブロックを数える／英語を聞いて数字をえらぶ／タップで数える（〜10・〜20・〜100） */
 (function () {
   "use strict";
   const GAME_ID = "counting";
   const ROUND = 5; // 1回のあそびで何問か
+  // 範囲ごとの出題（前の範囲と重ならないようにする：#16）
+  const RANGES = { 10: [1, 10], 20: [11, 20], 100: [21, 100] };
 
   const $ = (id) => document.getElementById(id);
   const menu = $("menu"), play = $("play"), word = $("word"), choicesEl = $("choices"), progressEl = $("progress");
@@ -12,6 +14,7 @@
   EG.fit($("menu-fit"), { fill: true });
   const stage = EG.fit($("stage"), { max: 3 });
   const BLOCK = 48; // ブロックの基本の大きさ（EG.fit で画面に合わせて拡大される）
+  const SMALL = 26; // 10のぼう のときのブロック
 
   EG.mountHeader({
     title: "かぞえよう",
@@ -47,10 +50,12 @@
 
   /** 前回と同じ数が続かないように出題 */
   function pickNumber() {
+    const [lo, hi] = RANGES[max];
     let n;
-    do { n = EG.randInt(1, max); } while (n === last && max > 1);
+    do { n = EG.randInt(lo, hi); } while (n === last && hi > lo);
     return (last = n);
   }
+  const big = () => max === 100;
 
   function next() {
     if (qIndex >= ROUND) {
@@ -72,27 +77,46 @@
     next();
   }
 
-  /** ブロックを1つずつ光らせながら英語で数える */
-  async function countAlong(blocks) {
-    for (let i = 0; i < blocks.length; i++) {
-      blocks[i].classList.add("count-on", "tapped");
-      blocks[i].innerHTML = `<span class="num">${i + 1}</span>`;
-      word.textContent = EG.numberWord(i + 1);
+  /**
+   * ブロックを並べる。〜20 は1こずつ、〜100 は 10のぼう＋ばら
+   * @returns {{items: Array<{el:HTMLElement, value:number}>}}  数える順（ぼう=10、ばら=1）
+   */
+  function drawNumber(box, n, color) {
+    if (!big()) {
+      const blocks = EG.renderBlocks(box, [{ count: n, color }], { size: BLOCK, stagger: 40 });
+      return blocks.map((el) => ({ el, value: 1 }));
+    }
+    const t = EG.renderTens(box, EG.tensOf(n, color), { size: SMALL, stagger: 30 });
+    return t.rods.map((el) => ({ el, value: 10 })).concat(t.ones.map((el) => ({ el, value: 1 })));
+  }
+
+  /** 1つずつ光らせながら英語で数える（ぼうは 10ずつ：ten, twenty, …） */
+  async function countAlong(items) {
+    let total = 0;
+    for (let i = 0; i < items.length; i++) {
+      total += items[i].value;
+      items[i].el.classList.add("count-on", "tapped");
+      if (items[i].value === 1 && !big()) items[i].el.innerHTML = `<span class="num">${total}</span>`;
+      word.textContent = EG.numberWord(total);
       EG.sfx.pop(i);
-      await EG.say(EG.numberWord(i + 1), "en", { speed: 1.2 });
-      await EG.wait(80);
+      await EG.say(EG.numberWord(total), "en", { speed: 1.2 });
+      await EG.wait(60);
     }
   }
 
+  const numLabel = (v) => `<span class="choice-num">${v}</span><small>${EG.numberWord(v)}</small>`;
+  function newBox() { stage.innerHTML = ""; const d = document.createElement("div"); stage.appendChild(d); return d; }
+
   // ---- モード1：いくつ？ ----
   function howmany(n) {
-    const blocks = EG.renderBlocks(stage.appendChild(clear()), [{ count: n, color: "a" }], { size: BLOCK });
+    const items = drawNumber(newBox(), n, "a");
     EG.say("How many?");
-    const opts = EG.makeChoices(n, 3, 1, max);
+    const [lo, hi] = RANGES[max];
+    const opts = EG.makeChoices(n, 3, Math.max(1, lo - 2), hi);
     EG.renderChoices(choicesEl, opts, n, {
-      label: (v) => `<span class="choice-num">${v}</span><small>${EG.numberWord(v)}</small>`,
+      label: numLabel,
       onCorrect: async () => {
-        await countAlong(blocks);
+        await countAlong(items);
         word.textContent = `${n}  ${EG.numberWord(n)}!`;
         EG.confetti(60);
         await EG.say(EG.numberWord(n) + "!");
@@ -104,52 +128,52 @@
 
   // ---- モード2：えいごで きこう ----
   function listen(n) {
-    const box = clear();
+    const box = newBox();
     const btn = document.createElement("button");
     btn.className = "eg-btn listen";
     btn.textContent = "🔊";
     btn.setAttribute("aria-label", "もういちど きく");
     btn.onclick = () => EG.sayNumber(n);
     box.appendChild(btn);
-    stage.appendChild(box);
     EG.wait(300).then(() => EG.sayNumber(n));
 
-    const opts = EG.makeChoices(n, max <= 10 ? 3 : 4, 1, max);
+    const [lo, hi] = RANGES[max];
+    const opts = EG.makeChoices(n, max === 10 ? 3 : 4, Math.max(1, lo - 2), hi);
     EG.renderChoices(choicesEl, opts, n, {
+      label: big() ? numLabel : (v) => v,
       onCorrect: async () => {
         box.innerHTML = "";
-        const g = document.createElement("div");
-        box.appendChild(g);
-        EG.renderBlocks(g, [{ count: n, color: "c" }], { size: BLOCK, numbers: true, stagger: 40 });
+        if (big()) drawNumber(box, n, "c");
+        else EG.renderBlocks(box, [{ count: n, color: "c" }], { size: BLOCK, numbers: true, stagger: 40 });
         word.textContent = `${n}  ${EG.numberWord(n)}!`;
         await EG.say(EG.numberWord(n) + "!");
         await EG.wait(500);
         finishQuestion();
       },
-      onWrong: (v, b) => { EG.say("This is " + EG.numberWord(v)); },
+      onWrong: (v) => { EG.say("This is " + EG.numberWord(v)); },
     });
   }
 
-  // ---- モード3：タップで かぞえる（まちがいなし） ----
+  // ---- モード3：タップで かぞえる（まちがいなし。ぼうは +10、ばらは +1） ----
   function tap(n) {
-    const box = clear();
-    const blocks = EG.renderBlocks(box, [{ count: n, color: "b" }], { size: BLOCK });
-    stage.appendChild(box);
-    choicesEl.innerHTML = `<div class="tap-hint">ブロックを タップしてね</div>`;
-    let counted = 0;
-    blocks.forEach((b) => {
-      b.style.cursor = "pointer";
-      b.addEventListener("pointerdown", async () => {
-        if (b.dataset.done) return;
-        b.dataset.done = "1";
-        counted++;
-        b.style.setProperty("--c", "var(--block-c)");
-        b.classList.add("tapped");
-        b.innerHTML = `<span class="num">${counted}</span>`;
+    const box = newBox();
+    const items = drawNumber(box, n, "b");
+    choicesEl.innerHTML = `<div class="tap-hint">${big() ? "ぼう（10）と ブロックを<br>タップしてね" : "ブロックを タップしてね"}</div>`;
+    let counted = 0, done = 0;
+    items.forEach(({ el, value }) => {
+      el.style.cursor = "pointer";
+      el.addEventListener("pointerdown", async () => {
+        if (el.dataset.done) return;
+        el.dataset.done = "1";
+        counted += value; done++;
+        if (value === 10) el.querySelectorAll(".eg-block").forEach((b) => b.style.setProperty("--c", "var(--block-c)"));
+        else el.style.setProperty("--c", "var(--block-c)");
+        el.classList.add("tapped");
+        if (!big()) el.innerHTML = `<span class="num">${counted}</span>`;
         word.textContent = EG.numberWord(counted);
-        EG.sfx.pop(counted);
+        EG.sfx.pop(done);
         EG.sayNumber(counted);
-        if (counted === n) {
+        if (done === items.length) {
           await EG.wait(700);
           choicesEl.innerHTML = `<div class="big-num">${n}</div>`;
           word.textContent = `${EG.numberWord(n)}!`;
@@ -162,11 +186,5 @@
         }
       });
     });
-  }
-
-  function clear() {
-    stage.innerHTML = "";
-    const d = document.createElement("div");
-    return d;
   }
 })();

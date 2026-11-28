@@ -26,6 +26,17 @@
     .mul-row { display: flex; align-items: center; gap: 10px; }
     .mul-row .tag { font-size: 24px; font-weight: 700; color: var(--ink-soft); min-width: 2.4em; text-align: right; opacity: 0; transition: opacity .3s; }
     .mul-row .tag.on { opacity: 1; color: var(--accent); }
+    /* わりざん：ブロックの山 と おさら */
+    .div-wrap { display: flex; flex-direction: column; align-items: center; gap: 28px; }
+    .div-pile { min-height: 10px; }
+    .div-plates { display: grid; gap: 18px; justify-content: center; }
+    .plate {
+      min-width: calc(var(--size) * 2.4); min-height: calc(var(--size) * 2.4); padding: 14px;
+      border-radius: 999px; background: #fff; box-shadow: 0 6px 0 rgba(59,47,42,.12), inset 0 0 0 5px #f1e7dd;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .plate.on { box-shadow: 0 0 0 6px #ffc93c, 0 6px 0 rgba(59,47,42,.12); }
+    .plate-in { display: grid; gap: 4px; }
     .hint-btn { font-size: clamp(24px, calc(var(--u) * 4.4), 36px); min-height: 88px; }
   </style>
 </head>

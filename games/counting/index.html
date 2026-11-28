@@ -19,6 +19,7 @@
     .big-num { font-size: 120px; font-weight: 800; color: var(--accent); line-height: 1; animation: eg-pop .4s; }
     .listen { font-size: 80px; width: 150px; height: 150px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1; }
     .choice-num { display: block; line-height: 1.05; }
+    .eg-choices .eg-btn small { font-size: .32em; }
     .eg-block.count-on { outline: 6px solid #ffc93c; outline-offset: 2px; }
     .tap-hint { color: var(--ink-soft); font-size: clamp(18px, calc(var(--u) * 3.4), 26px); text-align: center; }
   </style>
@@ -29,8 +30,9 @@
     <section id="menu">
       <div id="menu-fit">
         <div class="range" id="range">
-          <button class="eg-btn on" data-max="10">1〜10</button>
-          <button class="eg-btn" data-max="20">1〜20</button>
+          <button class="eg-btn on" data-max="10">〜10</button>
+          <button class="eg-btn" data-max="20">〜20</button>
+          <button class="eg-btn" data-max="100">〜100</button>
         </div>
         <div class="menu">
           <button class="eg-btn" data-mode="howmany"><span class="e">🧱</span>いくつ？<small>How many?</small></button>

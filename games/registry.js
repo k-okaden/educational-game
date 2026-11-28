@@ -49,4 +49,13 @@ window.EG_GAMES = [
     href: "games/math-blocks/index.html?op=mul",
     tags: ["かず", "けいさん"],
   },
+  {
+    id: "div",
+    title: "わりざん",
+    sub: "divided by ÷",
+    symbol: "÷",
+    color: "#1abc9c",
+    href: "games/math-blocks/index.html?op=div",
+    tags: ["かず", "けいさん"],
+  },
 ];
