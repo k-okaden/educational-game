@@ -4,7 +4,7 @@
   "description": "かず・えいご・けいさんの ちいくゲーム",
   "start_url": "./index.html",
   "scope": "./",
-  "display": "fullscreen",
+  "display": "standalone",
   "orientation": "any",
   "background_color": "#fff8ec",
   "theme_color": "#fff8ec",

@@ -34,7 +34,7 @@ html, body {
   margin: 0;
   height: var(--app-h);
   overflow: hidden; /* どの画面もスクロールしない（1画面に収める） */
-  background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%) fixed;
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
   color: var(--ink);
   font-family: var(--font);
   -webkit-user-select: none;
@@ -44,7 +44,19 @@ html, body {
   overscroll-behavior: none;
 }
 
-body { display: flex; flex-direction: column; }
+/* 画面の四隅にぴったり固定（指でなぞってもページが動かない・すき間を作らない） */
+body {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+  height: auto;
+  display: flex; flex-direction: column;
+}
+
+/* ===== 丸の中のアイコンを ちょうど真ん中に =====
+   絵文字に文章用の行の高さが付くと上下にずれるので、行の高さ 1・上下左右の中央にそろえる */
+.eg-center, .eg-round-btn, .eg-kid {
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1; padding: 0; text-align: center;
+}
 
 button {
   font-family: inherit;
@@ -75,8 +87,6 @@ button {
   background: var(--card);
   box-shadow: var(--shadow);
   font-size: calc(var(--btn) * .5);
-  display: grid;
-  place-items: center;
   flex: none;
 }
 .eg-round-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(59,47,42,.15); }
@@ -100,7 +110,7 @@ button {
   width: var(--btn); height: var(--btn); border-radius: 50%;
   background: var(--kc, #ddd);
   box-shadow: var(--shadow), inset 0 0 0 4px #fff;
-  display: grid; place-items: center; font-size: calc(var(--btn) * .56); flex: none;
+  font-size: calc(var(--btn) * .56); flex: none;
 }
 
 /* おとなロック：長押し中にリングがたまる */
@@ -269,13 +279,16 @@ button {
   display: grid;
   place-items: center;
   background: rgba(255, 248, 236, .92);
+  padding: 16px;
   z-index: 50;
   animation: eg-fade .3s;
 }
 .eg-reward .box { text-align: center; }
 .eg-reward .big { font-size: clamp(64px, calc(var(--u) * 16), 160px); line-height: 1.1; animation: eg-bump .8s; }
 .eg-reward h2 { font-size: clamp(28px, calc(var(--u) * 6), 56px); margin: 8px 0 calc(var(--u) * 3); }
-.eg-reward .row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+.eg-reward .row { display: flex; gap: 20px; justify-content: center; flex-wrap: nowrap; }
+.eg-reward .row .eg-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 200px; min-height: 120px; font-size: 28px; line-height: 1.1; }
+.eg-reward .row .eg-btn .ic { font-size: 44px; line-height: 1; }
 
 #eg-confetti { position: fixed; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; z-index: 60; }
 

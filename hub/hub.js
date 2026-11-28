@@ -332,6 +332,7 @@
   }
   function fillAdult() {
     $("s-sound").checked = EG.settings.sound;
+    $("s-cheer").checked = EG.settings.cheer;
     $("s-voice").checked = EG.settings.voice;
     $("s-rate").value = EG.settings.rate;
     fillVoices();
@@ -354,6 +355,7 @@
   $("s-voiceuri").onchange = (e) => { EG.settings.voiceURI = e.target.value; EG.saveSettings(); EG.say(SAMPLE); };
   $("s-test").onclick = () => EG.say(SAMPLE);
   $("s-sound").onchange = (e) => { EG.settings.sound = e.target.checked; EG.saveSettings(); };
+  $("s-cheer").onchange = (e) => { EG.settings.cheer = e.target.checked; EG.saveSettings(); if (e.target.checked) EG.sfx.cheer(); };
   $("s-voice").onchange = (e) => { EG.settings.voice = e.target.checked; EG.saveSettings(); };
   $("s-rate").onchange = (e) => { EG.settings.rate = +e.target.value; EG.saveSettings(); EG.say("one, two, three"); };
 

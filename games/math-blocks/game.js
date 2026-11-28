@@ -108,7 +108,7 @@
   // ---- 出題 ----
   function next() {
     if (qIndex >= ROUND) {
-      EG.showReward({ title: "ぜんぶ できたね！", emoji: "🏆", onAgain: () => start(level) });
+      EG.showReward({ title: "ぜんぶ できたね！", emoji: "🏆", onAgain: () => start(level), onMenu: showMenu, menuLabel: CONFIG.title + "の はじめ" });
       return;
     }
     EG.renderProgress(progressEl, qIndex, ROUND);

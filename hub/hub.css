@@ -24,7 +24,7 @@
   padding: 20px; animation: eg-pop .4s backwards;
 }
 .choice:active { transform: translateY(6px); box-shadow: 0 4px 0 rgba(0,0,0,.18); }
-.choice .e { font-size: 76px; line-height: 1; }
+.choice .e { font-size: 76px; line-height: 1; display: block; }
 .choice b { font-size: 32px; text-shadow: 0 3px 0 rgba(0,0,0,.15); }
 .choice small { font-size: 17px; opacity: .95; font-weight: 600; }
 .choice.wide { width: 100%; }
@@ -65,12 +65,12 @@
 .kid .face {
   width: calc(var(--cell, 180px) * .82); height: calc(var(--cell, 180px) * .82); border-radius: 50%;
   background: var(--kc); box-shadow: 0 8px 0 rgba(0,0,0,.15), inset 0 0 0 calc(var(--cell, 180px) * .04) #fff;
-  display: grid; place-items: center; font-size: calc(var(--cell, 180px) * .46);
+  display: flex; align-items: center; justify-content: center; line-height: 1; font-size: calc(var(--cell, 180px) * .46);
 }
 .kid:active .face { transform: translateY(5px); box-shadow: 0 3px 0 rgba(0,0,0,.15), inset 0 0 0 calc(var(--cell, 180px) * .04) #fff; }
 .kid b { font-size: clamp(16px, calc(var(--cell, 180px) * .17), 36px); white-space: nowrap; }
 .kid small { font-size: clamp(13px, calc(var(--cell, 180px) * .1), 20px); color: var(--ink-soft); font-weight: 700; }
-.kid.add .face { background: #fff; color: var(--ink-soft); box-shadow: 0 8px 0 rgba(0,0,0,.1), inset 0 0 0 5px #eadfd5; }
+.kid.add .face { background: #fff; color: var(--ink-soft); font-weight: 300; box-shadow: 0 8px 0 rgba(0,0,0,.1), inset 0 0 0 5px #eadfd5; }
 
 /* こどもを ふやす：縦向きは上下、横向きは左右 */
 .kid-form { display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; max-width: 980px; margin: 0 auto; }
@@ -78,13 +78,18 @@
 @media (min-aspect-ratio: 5/4) {
   .kid-form { flex-direction: row; align-items: center; justify-content: center; gap: 40px; }
   .kf-left { width: 320px; }
-  .kf-right { width: 480px; }
+  .kf-right { width: 360px; }
 }
-.kid-preview { width: 130px; height: 130px; border-radius: 50%; margin: 0 auto; background: var(--kc); display: grid; place-items: center; font-size: 76px; box-shadow: inset 0 0 0 8px #fff, var(--shadow); }
+.kid-preview { width: 130px; height: 130px; border-radius: 50%; margin: 0 auto; background: var(--kc); display: flex; align-items: center; justify-content: center; line-height: 1; font-size: 76px; box-shadow: inset 0 0 0 8px #fff, var(--shadow); }
 .kid-name { text-align: center; font-size: 30px !important; font-weight: 700; }
 .lbl { margin: 0; font-weight: 700; color: var(--ink-soft); }
-.pick { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
-.pick button { width: 68px; height: 68px; border-radius: 50%; background: #fff; box-shadow: var(--shadow); font-size: 38px; }
+/* マーク 16個・色 8個：割り切れる並び（縦向き 8列、横向き 4列）にして、最後の行がずれないようにする */
+.pick { display: grid; grid-template-columns: repeat(8, 60px); gap: 10px; justify-content: center; }
+.pick button { width: 60px; height: 60px; border-radius: 50%; background: #fff; box-shadow: var(--shadow); font-size: 34px; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0; }
+@media (min-aspect-ratio: 5/4) {
+  .pick { grid-template-columns: repeat(4, 68px); gap: 12px; }
+  .pick button { width: 68px; height: 68px; font-size: 38px; }
+}
 .pick button.on { box-shadow: 0 0 0 5px var(--accent), var(--shadow); transform: scale(1.08); }
 .pick.colors button { background: var(--c); }
 
@@ -95,7 +100,7 @@
   display: flex; align-items: center; gap: 8px; height: var(--btn); padding: 0 18px 0 5px;
   border-radius: 999px; background: #fff; box-shadow: var(--shadow); font-size: calc(var(--btn) * .34); font-weight: 700; white-space: nowrap; flex: none;
 }
-.kid-chip .ic { width: calc(var(--btn) - 10px); height: calc(var(--btn) - 10px); border-radius: 50%; background: var(--kc); display: grid; place-items: center; font-size: calc(var(--btn) * .48); }
+.kid-chip .ic { width: calc(var(--btn) - 10px); height: calc(var(--btn) - 10px); border-radius: 50%; background: var(--kc); display: flex; align-items: center; justify-content: center; line-height: 1; font-size: calc(var(--btn) * .48); flex: none; }
 .sync-dot { width: 14px; height: 14px; border-radius: 50%; background: transparent; flex: none; }
 .sync-dot.ok { background: var(--good); }
 .sync-dot.busy { background: #ffc93c; }
@@ -111,7 +116,7 @@
   box-shadow: 0 8px 0 rgba(0,0,0,.18); text-decoration: none; transition: transform .1s; animation: eg-pop .4s backwards;
 }
 .card:active { transform: translateY(6px); box-shadow: 0 3px 0 rgba(0,0,0,.18); }
-.card .emoji { font-size: calc(var(--cell, 200px) * .38); line-height: 1; filter: drop-shadow(0 4px 0 rgba(0,0,0,.15)); }
+.card .emoji { font-size: calc(var(--cell, 200px) * .38); line-height: 1; display: block; text-align: center; filter: drop-shadow(0 4px 0 rgba(0,0,0,.15)); }
 .card .emoji.sym { font-size: calc(var(--cell, 200px) * .5); font-weight: 900; color: #fff; text-shadow: 0 5px 0 rgba(0,0,0,.15); filter: none; }
 .card .t { font-size: calc(var(--cell, 200px) * .14); font-weight: 800; text-shadow: 0 3px 0 rgba(0,0,0,.15); white-space: nowrap; }
 .card .s { font-size: calc(var(--cell, 200px) * .075); font-weight: 600; opacity: .9; white-space: nowrap; }
@@ -148,7 +153,7 @@ dialog select { font: inherit; font-size: 17px; max-width: 60%; padding: 8px; bo
 .note-box p { line-height: 1.6; margin: 4px 0; }
 .a-kids { display: flex; flex-direction: column; gap: 8px; }
 .a-kid { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 16px; background: #faf6f2; }
-.a-kid .ic { width: 48px; height: 48px; border-radius: 50%; background: var(--kc); display: grid; place-items: center; font-size: 28px; flex: none; }
+.a-kid .ic { width: 48px; height: 48px; border-radius: 50%; background: var(--kc); display: flex; align-items: center; justify-content: center; line-height: 1; font-size: 28px; flex: none; }
 .a-kid .nm { flex: 1; font-size: 19px; font-weight: 700; min-width: 0; }
 .a-kid .meta { font-size: 13px; color: var(--ink-soft); font-weight: 600; display: block; }
 .a-kid button { min-height: 48px; padding: 6px 12px; font-size: 16px; border-radius: 14px; background: #fff; box-shadow: 0 3px 0 rgba(0,0,0,.08); flex: none; }

@@ -74,7 +74,7 @@ sw.js                 オフライン対応
 | `EG.mountHeader({ title })` | 🏠ボタン・タイトル・⭐数のヘッダー |
 | `EG.say(text, "en" \| "ja")` | 読み上げ（Promise） |
 | `EG.numberWord(n)` / `EG.sayNumber(n)` | 7 → "seven" |
-| `EG.sfx.tap/correct/wrong/fanfare/pop(i)` | 効果音（音声ファイル不要） |
+| `EG.sfx.tap/correct/wrong/fanfare/pop(i)/cheer(big)` | 効果音（音声ファイル不要）。`cheer` は歓声「わーっ！」 |
 | `EG.renderBlocks(el, [{count, color}], opt)` | ブロックを5こずつ並べる |
 | `EG.fit(el, { max, fill })` | 中身を画面に合わせて拡大・縮小（スクロールしない）。戻り値の内側の要素に中身を入れる |
 | `EG.gridFit(el, () => 数, opt)` | カードをスクロールせずに いちばん大きく並べる |
@@ -82,7 +82,7 @@ sw.js                 オフライン対応
 | `EG.makeChoices(answer, n, min, max)` | 正解の近くの数で選択肢を作る |
 | `EG.stars.add(gameId)` | いま遊んでいるこどもに ⭐ を追加 |
 | `EG.save.get(gameId)` / `EG.save.set(gameId, data)` | ゲームごとのセーブデータ（こどもごと・クラウド同期も自動。Firebase 側の変更は不要） |
-| `EG.showReward({ onAgain })` | ごほうび画面＋紙ふぶき |
+| `EG.showReward({ onAgain, onMenu, menuLabel })` | ごほうび画面（もういちど／ゲームのはじめ／おうち）＋紙ふぶき＋歓声 |
 
 ### 大きなゲームを別リポジトリで作りたいとき
 

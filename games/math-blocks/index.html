@@ -4,11 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>けいさんブロック</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#fff8ec" />
   <link rel="stylesheet" href="../../shared/core.css" />
   <style>
     .levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 2.5); width: min(900px, 100%); margin: 0 auto; }
     .levels .eg-btn { min-height: calc(var(--u) * 24); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 8px; font-size: clamp(22px, calc(var(--u) * 4.4), 40px); }
-    .levels .eg-btn .e { font-size: calc(var(--u) * 7.5); letter-spacing: -6px; line-height: 1.2; }
+    .levels .eg-btn .e { font-size: calc(var(--u) * 7); line-height: 1; display: block; margin-bottom: 6px; }
     .lead { font-size: clamp(22px, calc(var(--u) * 4), 36px); margin: 0 0 calc(var(--u) * 3); text-align: center; }
 
     .eq { display: flex; align-items: center; gap: .3em; font-size: clamp(40px, calc(var(--u) * 9), 110px); font-weight: 800; line-height: 1; }

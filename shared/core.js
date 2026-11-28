@@ -10,7 +10,8 @@
  *   EG.save.get/set(gameId)   -> ゲームごとのセーブデータ（こどもごと・クラウド同期対応）
  *   EG.renderBlocks(el, [{count:3, color:"a"}, {count:2, color:"b"}])
  *   EG.mountHeader({ title, gameId })
- *   EG.showReward({ onAgain, onHome })
+ *   EG.showReward({ onAgain, onMenu, menuLabel })
+ *   EG.sfx.cheer()            -> 歓声「わーっ！」
  */
 (function () {
   "use strict";
@@ -21,15 +22,28 @@
   // ---------- 画面の大きさ（スクロールなしで1画面に収めるため） ----------
   // 100vh は iPad の Safari でアドレスバーの分ずれるので、実際の高さを CSS 変数 --app-h に入れる
   const setAppHeight = () => document.documentElement.style.setProperty("--app-h", window.innerHeight + "px");
+  // 回転した直後は高さがすぐに決まらない（ホーム画面のアプリだと特に遅い）ので、何回か取り直す
+  const remeasure = () => { setAppHeight(); [100, 300, 600, 1000].forEach((ms) => setTimeout(setAppHeight, ms)); };
   setAppHeight();
-  window.addEventListener("resize", setAppHeight);
-  window.addEventListener("orientationchange", () => setTimeout(setAppHeight, 300));
+  window.addEventListener("resize", remeasure);
+  window.addEventListener("orientationchange", remeasure);
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", remeasure);
+
+  // 指でなぞっても画面が動かない（揺れない）ようにする。
+  // iPadOS 15 は overscroll-behavior が効かないので、なぞる動きそのものを止める（入力欄・スライダーなどは除く）
+  document.addEventListener("touchmove", (e) => {
+    if (e.touches && e.touches.length > 1) { e.preventDefault(); return; } // 2本指のズームも止める
+    const t = e.target;
+    if (t && t.closest && t.closest("textarea, select, input, .eg-scroll")) return;
+    e.preventDefault();
+  }, { passive: false });
+  document.addEventListener("gesturestart", (e) => e.preventDefault());
 
   const onNextFrame = (fn) => { let q = false; return () => { if (q) return; q = true; requestAnimationFrame(() => { q = false; fn(); }); }; };
   function watchSize(els, fn) {
     if (window.ResizeObserver) { const ro = new ResizeObserver(fn); els.forEach((e) => ro.observe(e)); }
     window.addEventListener("resize", fn);
-    window.addEventListener("orientationchange", () => setTimeout(fn, 350));
+    window.addEventListener("orientationchange", () => [120, 350, 700, 1100].forEach((ms) => setTimeout(fn, ms)));
   }
 
   /**
@@ -153,7 +167,7 @@
   const SETTINGS_VERSION = 2; // 標準の速さを変えたときに上げる（古い保存値をリセット）
   // rate: 英語の読み上げ速度（1 = 標準）。幼児向けにゆっくりめ
   // voiceURI: 「おうちのかたへ」で選んだ英語の声（空ならおすすめを自動で選ぶ）
-  const defaults = { v: SETTINGS_VERSION, sound: true, voice: true, rate: 0.75, voiceURI: "" };
+  const defaults = { v: SETTINGS_VERSION, sound: true, cheer: true, voice: true, rate: 0.75, voiceURI: "" };
   const stored = safeJSON(localStorage.getItem(SETTINGS_KEY));
   if (stored.v !== SETTINGS_VERSION) delete stored.rate;
   EG.settings = Object.assign({}, defaults, stored, { v: SETTINGS_VERSION });
@@ -272,6 +286,82 @@
     correct: () => { tone(784, 0, 0.15, "triangle"); tone(1047, 0.12, 0.3, "triangle"); },
     wrong: () => { tone(330, 0, 0.18, "sine", 0.18); tone(262, 0.15, 0.25, "sine", 0.18); },
     fanfare: () => [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, i * 0.13, 0.25, "triangle")),
+    /** 歓声「わーっ！」（big = true でごほうび用の長い歓声＋拍手） */
+    cheer: (big = false) => {
+      const c = audio();
+      if (!c || !EG.settings.sound || !EG.settings.cheer) return;
+      EG.makeCheer(c, c.destination, c.currentTime + 0.02, big);
+    },
+  };
+
+  /**
+   * 歓声を合成する（音声ファイルなし）。たくさんの人が「わーっ！」と言う声＋拍手。
+   *  - 1人ぶんの声 = のこぎり波（声の高さ）→ 母音「あ」の響き（フォルマント）を通す
+   *  - 「わ」：はじめは口をすぼめた響き（う）から「あ」に開いていく
+   *  - 人数ぶん 高さ・始まり・ゆれ をばらばらにして重ねる
+   * OfflineAudioContext でも動くように、ctx と出力先を受けとる
+   */
+  EG.makeCheer = (c, dest, t0, big = false) => {
+    const voices = big ? 14 : 9;
+    const dur = big ? 2.0 : 1.05;
+    const master = c.createGain();
+    master.gain.value = big ? 0.8 : 0.68;
+    const comp = c.createDynamicsCompressor();
+    master.connect(comp).connect(dest);
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    for (let i = 0; i < voices; i++) {
+      const st = t0 + rnd(0, 0.12);
+      const end = st + dur * rnd(0.8, 1.05);
+      const f0 = i % 3 === 0 ? rnd(170, 260) : rnd(280, 480); // おとな と こども の声
+      const o = c.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(f0 * 0.92, st);
+      o.frequency.linearRampToValueAtTime(f0 * 1.12, st + 0.18); // 「わー」で声が上がる
+      o.frequency.linearRampToValueAtTime(f0 * 0.95, end);
+      const lfo = c.createOscillator(); // 声のゆれ
+      lfo.frequency.value = rnd(4.5, 7);
+      const lg = c.createGain(); lg.gain.value = f0 * 0.025;
+      lfo.connect(lg).connect(o.frequency);
+      const vg = c.createGain();
+      vg.gain.setValueAtTime(0, st);
+      vg.gain.linearRampToValueAtTime(rnd(0.5, 1) / voices, st + 0.09);
+      vg.gain.setValueAtTime(rnd(0.5, 1) / voices, end - 0.35);
+      vg.gain.exponentialRampToValueAtTime(0.0001, end);
+      o.connect(vg);
+      // 母音のフォルマント（う → あ）
+      [[320, 800, 9, 1], [700, 1250, 10, 0.7], [2300, 2600, 12, 0.25]].forEach(([fa, fb, q, amp]) => {
+        const bp = c.createBiquadFilter();
+        bp.type = "bandpass"; bp.Q.value = q;
+        bp.frequency.setValueAtTime(fa, st);
+        bp.frequency.linearRampToValueAtTime(fb, st + 0.12);
+        const ag = c.createGain(); ag.gain.value = amp * 3;
+        vg.connect(bp).connect(ag).connect(master);
+      });
+      o.start(st); lfo.start(st); o.stop(end + 0.05); lfo.stop(end + 0.05);
+    }
+    // 息の音（ザーッ）
+    const len = Math.floor(c.sampleRate * (dur + 0.2));
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const ns = c.createBufferSource(); ns.buffer = buf;
+    const nf = c.createBiquadFilter(); nf.type = "bandpass"; nf.frequency.value = 1400; nf.Q.value = 0.8;
+    const ng = c.createGain();
+    ng.gain.setValueAtTime(0, t0); ng.gain.linearRampToValueAtTime(0.05, t0 + 0.1); ng.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    ns.connect(nf).connect(ng).connect(master);
+    ns.start(t0); ns.stop(t0 + dur + 0.1);
+    // 拍手（ごほうびのとき）
+    if (big) {
+      for (let i = 0; i < 46; i++) {
+        const ct = t0 + 0.15 + Math.random() * (dur + 0.4);
+        const src = c.createBufferSource(); src.buffer = buf;
+        const hp = c.createBiquadFilter(); hp.type = "bandpass"; hp.frequency.value = rnd(900, 2200); hp.Q.value = 1.2;
+        const g = c.createGain();
+        g.gain.setValueAtTime(0, ct); g.gain.linearRampToValueAtTime(rnd(0.15, 0.3), ct + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, ct + 0.06);
+        src.connect(hp).connect(g).connect(master);
+        src.start(ct, Math.random() * 0.5); src.stop(ct + 0.08);
+      }
+    }
   };
   // iOS は最初のタップで AudioContext を起こす必要がある
   // iOS は最初のタップで読み上げも起こしておく（無音の発話）
@@ -615,7 +705,13 @@
   };
 
   // ---------- ごほうび画面 ----------
-  EG.showReward = ({ title = "やったね！", emoji = "🏆", onAgain, homeHref = "../../index.html" } = {}) => {
+  /**
+   * ごほうび画面（5問おわったとき）
+   * @param {{title?:string, emoji?:string, onAgain?:Function, onMenu?:Function, menuLabel?:string, homeHref?:string}} opt
+   *   onMenu    : 「（ゲーム名）の はじめ」ボタン（レベル・モード選びに戻る）。省略するとボタンを出さない
+   *   menuLabel : そのボタンの文字（例「たしざんの はじめ」）
+   */
+  EG.showReward = ({ title = "やったね！", emoji = "🏆", onAgain, onMenu, menuLabel = "はじめに もどる", homeHref = "../../index.html" } = {}) => {
     const d = document.createElement("div");
     d.className = "eg-reward";
     d.innerHTML = `
@@ -623,22 +719,28 @@
         <div class="big">${emoji}</div>
         <h2></h2>
         <div class="row">
-          <button class="eg-btn" data-a="again">🔁 もういちど</button>
-          <button class="eg-btn" data-a="home">🏠 おうち</button>
+          <button class="eg-btn" data-a="again"><span class="ic">🔁</span>もういちど</button>
+          ${onMenu ? `<button class="eg-btn" data-a="menu"><span class="ic">⬅️</span><span class="lb"></span></button>` : ""}
+          <button class="eg-btn" data-a="home"><span class="ic">🏠</span>おうち</button>
         </div>
       </div>`;
     d.querySelector("h2").textContent = title;
+    if (onMenu) d.querySelector('[data-a="menu"] .lb').textContent = menuLabel;
     d.addEventListener("click", (e) => {
       const a = e.target.closest("button")?.dataset.a;
       if (!a) return;
       EG.sfx.tap();
-      if (a === "home") location.href = homeHref;
-      else { d.remove(); onAgain && onAgain(); }
+      if (a === "home") { location.href = homeHref; return; }
+      d.remove();
+      if (a === "menu") onMenu && onMenu();
+      else onAgain && onAgain();
     });
     document.body.appendChild(d);
+    EG.fit(d); // 画面に収める
     EG.sfx.fanfare();
+    EG.sfx.cheer(true);
     EG.confetti(200);
-    EG.say("Great job!");
+    setTimeout(() => EG.say("Great job!"), 900);
   };
 
   /** 選択肢ボタンを並べて、正解ならコールバック */
@@ -656,7 +758,9 @@
           locked = true;
           b.classList.add("good");
           EG.sfx.correct();
-          onCorrect && onCorrect(v, b);
+          EG.sfx.cheer();
+          // 歓声のあとに読み上げが始まるよう、少しだけ待つ
+          setTimeout(() => onCorrect && onCorrect(v, b), EG.settings.cheer && EG.settings.sound ? 550 : 0);
         } else {
           b.classList.add("bad");
           EG.sfx.wrong();

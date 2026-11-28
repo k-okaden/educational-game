@@ -54,7 +54,7 @@
 
   function next() {
     if (qIndex >= ROUND) {
-      EG.showReward({ title: "ぜんぶ できたね！", emoji: "🏆", onAgain: () => start(mode) });
+      EG.showReward({ title: "ぜんぶ できたね！", emoji: "🏆", onAgain: () => start(mode), onMenu: showMenu, menuLabel: "かぞえようの はじめ" });
       return;
     }
     EG.renderProgress(progressEl, qIndex, ROUND);
@@ -154,7 +154,9 @@
           choicesEl.innerHTML = `<div class="big-num">${n}</div>`;
           word.textContent = `${EG.numberWord(n)}!`;
           EG.sfx.correct();
+          EG.sfx.cheer();
           EG.confetti(60);
+          await EG.wait(EG.settings.cheer && EG.settings.sound ? 550 : 0);
           await EG.say(`${EG.numberWord(n)}! You counted ${EG.numberWord(n)}!`);
           finishQuestion();
         }

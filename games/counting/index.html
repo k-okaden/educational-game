@@ -4,17 +4,20 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>かぞえよう</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#fff8ec" />
   <link rel="stylesheet" href="../../shared/core.css" />
   <style>
     .menu { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 2.5); width: min(960px, 100%); margin: 0 auto; }
     .menu .eg-btn { min-height: calc(var(--u) * 26); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 12px 8px; font-size: clamp(22px, calc(var(--u) * 4.4), 40px); }
-    .menu .eg-btn .e { font-size: calc(var(--u) * 10); line-height: 1.1; }
+    .menu .eg-btn .e { font-size: calc(var(--u) * 10); line-height: 1; display: block; margin-bottom: 4px; }
     .range { display: flex; gap: 16px; justify-content: center; margin-bottom: calc(var(--u) * 3); }
     .range .eg-btn { font-size: clamp(22px, calc(var(--u) * 4), 32px); min-height: 72px; }
     .range .eg-btn.on { background: var(--accent); color: #fff; }
 
     .big-num { font-size: 120px; font-weight: 800; color: var(--accent); line-height: 1; animation: eg-pop .4s; }
-    .listen { font-size: 80px; width: 150px; height: 150px; border-radius: 50%; }
+    .listen { font-size: 80px; width: 150px; height: 150px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1; }
     .choice-num { display: block; line-height: 1.05; }
     .eg-block.count-on { outline: 6px solid #ffc93c; outline-offset: 2px; }
     .tap-hint { color: var(--ink-soft); font-size: clamp(18px, calc(var(--u) * 3.4), 26px); text-align: center; }
